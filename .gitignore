@@ -1,3 +1,12 @@
+# Ignore DS_Store
+.DS_Store
+._.DS_Store
+**/.DS_Store
+**/._.DS_Store
+
+# Private files: Contact BKChoi
+config.json
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
