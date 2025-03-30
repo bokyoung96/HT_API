@@ -6,6 +6,8 @@
 
 # Private files: Contact BKChoi
 config.json
+token.dat
+msg_bot.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
