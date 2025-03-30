@@ -78,6 +78,17 @@ class EventNotifier:
             msg += f"💵 주당배당금: {int(row['per_sto_divi_amt']):,}원\n\n"
         return msg
 
+    def _format_short_sell_message(self, short_sell_data: pd.DataFrame) -> str:
+        msg = f"💰 최근 주식 매도 랭킹 (상위 {self.top_n}건)\n\n"
+        for _, row in short_sell_data.iterrows():
+            msg += f"🔢 종목코드: {row['mksc_shrn_iscd']}\n"
+            msg += f"🏢 종목명: {row['hts_kor_isnm']}\n"
+            msg += f"📈 가격등락률: {row['prdy_ctrt']}%\n"
+            msg += f"📊 누적거래량: {int(row['acml_vol']):,}주\n"
+            msg += f"💰 공매도거래대금: {int(row['ssts_tr_pbmn']):,}원\n"
+            msg += f"📊 공매도거래대금비중: {row['ssts_tr_pbmn_rlim']}%\n\n"
+        return msg
+
     def notify_ipo(self, to_chat_room: bool = True):
         f_dt = datetime.now().replace(month=1, day=1).strftime("%Y%m%d")
         t_dt = (datetime.now().replace(day=1) +
@@ -113,9 +124,26 @@ class EventNotifier:
             self.sender.send_file(
                 div_res, f"dividend_list_{datetime.now().strftime('%Y%m%d')}.xlsx", to_chat_room=to_chat_room)
 
+    def notify_short_sell(self, to_chat_room: bool = True):
+        short_sell_res = pd.DataFrame(self.fetcher.get_short_sell_rank())
+
+        if not short_sell_res.empty:
+            short_sell_res['ssts_tr_pbmn_rlim'] = short_sell_res['ssts_tr_pbmn_rlim'].astype(
+                float)
+            short_sell_res = short_sell_res.sort_values(
+                'ssts_tr_pbmn_rlim', ascending=False)
+            short_sell_summary = short_sell_res.head(self.top_n)
+
+            short_sell_msg = self._format_short_sell_message(
+                short_sell_summary)
+            self.sender.send_msg(short_sell_msg, to_chat_room=to_chat_room)
+            self.sender.send_file(
+                short_sell_res, f"short_sell_list_{datetime.now().strftime('%Y%m%d')}.xlsx", to_chat_room=to_chat_room)
+
     def notify_all(self, to_chat_room: bool = True):
         self.notify_ipo(to_chat_room)
         self.notify_dividend(to_chat_room)
+        self.notify_short_sell(to_chat_room)
 
 
 if __name__ == "__main__":

@@ -8,6 +8,16 @@ from typing import Optional, Dict, Any
 
 @dataclass
 class AuthToken:
+    """
+    Class representing an authentication token.
+
+    Args:
+        access_token (str): The access token string
+        access_token_token_expired (str): Token expiration timestamp
+        token_type (str): Type of token (e.g. "Bearer")
+        expires_in (int): Token lifetime in seconds
+        _created_at (datetime): Token creation timestamp. Defaults to current time.
+    """
     access_token: str
     access_token_token_expired: str
     token_type: str
@@ -28,6 +38,12 @@ class AuthToken:
 
 
 class Base:
+    """
+    Base class providing authentication and configuration functionality.
+
+    Args:
+        config_path (str, optional): Path to configuration file. Defaults to DEFAULT_CONFIG.
+    """
     DEFAULT_CONFIG = "config.json"
 
     def __init__(self, config_path: str = None):
@@ -38,6 +54,15 @@ class Base:
 
     @classmethod
     def get_auth(cls, config_path: str = None) -> 'Base':
+        """
+        Create an authenticated instance of the class.
+
+        Args:
+            config_path (str, optional): Path to configuration file. Defaults to DEFAULT_CONFIG.
+
+        Returns:
+            Base: Authenticated instance
+        """
         config_path = config_path or cls.DEFAULT_CONFIG
         inst = cls(config_path=config_path)
         inst.token_info
@@ -45,31 +70,48 @@ class Base:
 
     @property
     def token_info(self) -> AuthToken:
+        """
+        Get current authentication token, fetching or refreshing if needed.
+
+        Returns:
+            AuthToken: Current valid authentication token
+        """
         if not self._auth_token or not self._auth_token.is_valid:
             self._auth_token = self._load_cached_token() or self._fetch_new_token()
         return self._auth_token
 
     @property
     def access_token(self) -> str:
+        """Get the current access token string"""
         return self.token_info.access_token
 
     @property
     def api_key(self) -> str:
+        """Get the API key from config"""
         return self.config.get('APP_KEY')
 
     @property
     def api_secret(self) -> str:
+        """Get the API secret from config"""
         return self.config.get('APP_SECRET')
 
     @property
     def account_no(self) -> str:
+        """Get the account number from config"""
         return self.config.get('ACCOUNT_NO')
 
     @property
     def url(self) -> str:
+        """Get the API base URL from config"""
         return self.config.get('URL')
 
     def _load_cached_token(self) -> Optional[AuthToken]:
+        """
+        Load cached token from file if it exists and is valid.
+
+        Returns:
+            Optional[AuthToken]: Cached token if valid, None otherwise
+        """
         if not os.path.exists(self.token_path):
             return None
 
@@ -82,10 +124,22 @@ class Base:
             return None
 
     def _save_token(self, token: AuthToken) -> None:
+        """
+        Save token to cache file.
+
+        Args:
+            token (AuthToken): Token to save
+        """
         with open(self.token_path, 'w') as f:
             json.dump(token.to_dict(), f, indent=4)
 
     def _fetch_new_token(self) -> AuthToken:
+        """
+        Fetch new authentication token from API.
+
+        Returns:
+            AuthToken: New authentication token
+        """
         headers = {"content-type": "application/json"}
         body = {
             "grant_type": "client_credentials",

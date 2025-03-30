@@ -7,6 +7,7 @@
 # Private files: Contact BKChoi
 config.json
 token.dat
+token.json
 msg_bot.json
 
 # Byte-compiled / optimized / DLL files
