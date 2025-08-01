@@ -5,10 +5,12 @@
 **/._.DS_Store
 
 # Private files: Contact BKChoi
+data
+postman
 config.json
 token.dat
 token.json
-msg_bot.json
+access_token.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
