@@ -5,10 +5,10 @@ from typing import Tuple
 def is_market_open() -> bool:
     now = datetime.now()
     current_time = now.time()
-    
+
     if now.weekday() >= 5:
         return False
-    
+
     market_open = time(9, 0)
     market_close = time(15, 30)
     return market_open <= current_time <= market_close
