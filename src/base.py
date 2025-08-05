@@ -2,9 +2,8 @@ import os
 import json
 import httpx
 import logging
-import asyncio
 from datetime import datetime, timedelta
-from typing import Optional
+from dataclasses import dataclass
 
 
 def setup_logging(config_dir: str):
@@ -18,44 +17,36 @@ def setup_logging(config_dir: str):
             logging.StreamHandler()
         ]
     )
+    
 
 
+@dataclass
 class KISConfig:
-    def __init__(self, config_path: str = "config.json"):
-        self.config_dir = os.path.dirname(os.path.abspath(
-            config_path)) if os.path.isabs(config_path) else os.getcwd()
-        path = os.path.join(self.config_dir, os.path.basename(config_path))
+    app_key: str
+    app_secret: str
+    base_url: str
+    account_number: str
+    polling_interval: int
+    stock_minute_tr_id: str
+    deriv_minute_tr_id: str
+    option_chain_tr_id: str
+    config_dir: str
 
-        with open(path, 'r', encoding='utf-8') as f:
-            self._config = json.load(f)
-
-        self.base_url = self._config.get("URL")
-
-        setup_logging(self.config_dir)
-
-    @property
-    def app_key(self) -> str:
-        return self._config.get("APP_KEY")
-
-    @property
-    def app_secret(self) -> str:
-        return self._config.get("APP_SECRET")
-
-    @property
-    def account_no(self) -> str:
-        return f"{self._config.get('ACCOUNT_NO')}-{self._config.get('ACCOUNT_NO_SUB')}"
-
-    @property
-    def stock_minute_tr_id(self) -> str:
-        return self._config.get("STOCK_MINUTE_TR_ID", "FHKST03010200")
-
-    @property
-    def deriv_minute_tr_id(self) -> str:
-        return self._config.get("DERIV_MINUTE_TR_ID", "FHKIF03020200")
-
-    @property
-    def polling_interval(self) -> int:
-        return self._config.get("POLLING_INTERVAL", 5)
+    def __init__(self, config_path: str):
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        self.base_url = config.get("base_url")
+        account_no = config.get("account_no", "")
+        account_no_sub = config.get("account_no_sub", "")
+        self.account_number = f"{account_no}-{account_no_sub}"
+        self.polling_interval = config.get("polling_interval", 2)
+        self.stock_minute_tr_id = config.get("tr_id", {}).get("stock_minute", "FHKST03010200")
+        self.deriv_minute_tr_id = config.get("tr_id", {}).get("deriv_minute", "FHKIF03020200")
+        self.option_chain_tr_id = config.get("tr_id", {}).get("option_chain", "FHPIF05030100")
+        
+        self.app_key = config.get("app_key")
+        self.app_secret = config.get("app_secret")
+        self.config_dir = os.path.dirname(config_path)
 
 
 class KISAuth:
@@ -75,8 +66,7 @@ class KISAuth:
                     self._access_token = data.get("access_token")
                     expires_str = data.get("expires_at")
                     if expires_str:
-                        self._token_expires_at = datetime.fromisoformat(
-                            expires_str)
+                        self._token_expires_at = datetime.fromisoformat(expires_str)
         except Exception as e:
             logging.warning(f"Failed to load saved token: {e}")
 
@@ -94,18 +84,18 @@ class KISAuth:
     async def get_access_token(self) -> str:
         if self._access_token and self._token_expires_at and datetime.now() < self._token_expires_at:
             return self._access_token
-
+        
         logging.info("Requesting new Access Token.")
         url = f"{self._config.base_url}/oauth2/tokenP"
         body = {
-            "grant_type": "client_credentials",
-            "appkey": self._config.app_key,
+            "grant_type": "client_credentials", 
+            "appkey": self._config.app_key, 
             "appsecret": self._config.app_secret
         }
         response = await self._client.post(url, json=body)
         response.raise_for_status()
         data = response.json()
-
+        
         self._access_token = data.get("access_token")
         expires_in = data.get("expires_in", 0)
         self._token_expires_at = datetime.now() + timedelta(seconds=expires_in - 600)
