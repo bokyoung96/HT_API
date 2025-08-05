@@ -8,6 +8,7 @@
 data
 postman
 config.json
+db_config.json
 token.dat
 token.json
 access_token.json
