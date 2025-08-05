@@ -1,27 +1,29 @@
-import os
-from dataclasses import dataclass
-from typing import Optional
+import json
+from dataclasses import dataclass, field
+from typing import Dict, Any
 
 
 @dataclass
 class DatabaseConfig:
-    """Supabase 데이터베이스 연결 설정"""
     supabase_url: str
     supabase_key: str
     postgres_url: str
-    
+    pool_settings: Dict[str, Any] = field(default_factory=dict)
+
     @classmethod
-    def from_env(cls) -> 'DatabaseConfig':
-        """환경변수에서 설정 로드"""
-        supabase_url = os.getenv('SUPABASE_URL')
-        supabase_key = os.getenv('SUPABASE_ANON_KEY')
-        postgres_url = os.getenv('SUPABASE_POSTGRES_URL')
-        
-        if not all([supabase_url, supabase_key, postgres_url]):
-            raise ValueError("Supabase 환경변수가 설정되지 않았습니다. .env 파일을 확인하세요.")
-        
+    def from_json(cls, config_path: str = "src/database/db_config.json") -> 'DatabaseConfig':
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+
+        db_config = config.get("database", {})
+
+        if not all(k in db_config for k in ["supabase_url", "supabase_key", "postgres_url"]):
+            raise ValueError(
+                "Database configuration is missing required keys in db_config.json")
+
         return cls(
-            supabase_url=supabase_url,
-            supabase_key=supabase_key,
-            postgres_url=postgres_url
-        ) 
+            supabase_url=db_config["supabase_url"],
+            supabase_key=db_config["supabase_key"],
+            postgres_url=db_config["postgres_url"],
+            pool_settings=db_config.get("pool_settings", {})
+        )

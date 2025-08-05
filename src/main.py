@@ -10,7 +10,7 @@ from orchestration import DataFeedBuilder
 async def main():
     logging.getLogger("httpx").setLevel(logging.WARNING)
     config = KISConfig("config.json")
-    
+
     setup_logging(config.config_dir)
 
     print(f"🕐 Current time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -48,4 +48,4 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n❌ Unexpected error: {e}")
     finally:
-        print("👋 Goodbye!") 
+        print("👋 Goodbye!")
