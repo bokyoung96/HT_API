@@ -34,8 +34,8 @@ async def main():
         builder = (
             DataFeedBuilder(config, auth, client)
             # .add_stock("005930", timeframe=1, name="Samsung Electronics")
-            .add_deriv("101W09", timeframe=1, name="KOSPI200 Futures")
-            .add_deriv("106W09", timeframe=1, name="KOSDAQ150 Futures")
+            # .add_deriv("101W09", timeframe=1, name="KOSPI200 Futures")
+            # .add_deriv("106W09", timeframe=1, name="KOSDAQ150 Futures")
             .add_option_chain(
                 maturity="202509",
                 underlying_asset_type="",
