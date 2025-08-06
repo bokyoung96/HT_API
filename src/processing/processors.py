@@ -57,9 +57,10 @@ class CandleProcessor:
 
 
 class DataProcessor(DataProcessorProtocol):
-    def __init__(self, queue: asyncio.Queue):
+    def __init__(self, queue: asyncio.Queue, data_writer=None):
         self._queue = queue
         self._processed_count = 0
+        self._data_writer = data_writer
         self._matrix_processor = OptionMatrixProcessor(
             metrics=[
                 "iv",
@@ -78,12 +79,29 @@ class DataProcessor(DataProcessorProtocol):
         while True:
             try:
                 data = await self._queue.get()
+                
                 if data.get("type") == "option_chain":
                     self._process_option_chain(data)
+                    if self._data_writer:
+                        await self._data_writer.save_option_chain_data(data)
+                        
+                        if hasattr(self._matrix_processor, 'get_current_matrices'):
+                            matrix_data = self._matrix_processor.get_current_matrices()
+                            if matrix_data:
+                                await self._data_writer.save_option_matrices({
+                                    "timestamp": data["timestamp"],
+                                    "underlying_symbol": data["underlying_symbol"],
+                                    **matrix_data
+                                })
                 else:
                     await self._process_single_data(data)
+                    data_type = data.get("type", "")
+                    if self._data_writer and "candle" in data_type:
+                        await self._data_writer.save_candle_data(data)
+                        
                 self._processed_count += 1
                 self._queue.task_done()
+                
             except Exception as e:
                 logging.error(f"Error processing data: {e}")
 

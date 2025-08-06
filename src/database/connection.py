@@ -1,10 +1,9 @@
 import asyncpg
 import logging
 from typing import Optional, Any, Dict, List
-from datetime import datetime
 
-from .config import DatabaseConfig
-from .schemas import ALL_TABLES
+from database.config import DatabaseConfig
+from database.schemas import ALL_STATIC_TABLES, create_futures_table_sql, create_option_matrices_table_sql
 
 
 class DatabaseConnection:
@@ -18,6 +17,7 @@ class DatabaseConnection:
                 dsn=self.config.postgres_url,
                 min_size=self.config.pool_settings.get("min_size", 1),
                 max_size=self.config.pool_settings.get("max_size", 10),
+                statement_cache_size=0,
                 server_settings=self.config.pool_settings.get(
                     "server_settings", {'jit': 'off'})
             )
@@ -31,8 +31,20 @@ class DatabaseConnection:
 
     async def _create_tables(self) -> None:
         async with self.pool.acquire() as conn:
-            for table_sql in ALL_TABLES:
+            for table_sql in ALL_STATIC_TABLES:
                 await conn.execute(table_sql)
+                
+    async def create_dynamic_table(self, table_type: str, symbol: str) -> None:
+        async with self.pool.acquire() as conn:
+            if table_type == "futures":
+                table_sql = create_futures_table_sql(symbol)
+            elif table_type == "option_matrices":
+                table_sql = create_option_matrices_table_sql(symbol)
+            else:
+                raise ValueError(f"Unknown table type: {table_type}")
+            
+            await conn.execute(table_sql)
+            logging.info(f"✅ Created dynamic table for {table_type}: {symbol}")
 
     async def close(self) -> None:
         if self.pool:

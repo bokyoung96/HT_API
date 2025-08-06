@@ -1,6 +1,7 @@
 import asyncio
 import logging
-from typing import List
+from datetime import datetime
+from typing import List, Any
 
 from fetchers.base_fetcher import PriceFetcher
 
@@ -15,25 +16,58 @@ class PollingManager:
     async def start_polling(self) -> None:
         self._running = True
         while self._running:
+            now = datetime.now()
+            wait_seconds = (
+                60.0 - now.second - (now.microsecond / 1_000_000)
+            ) + self._interval
+            if wait_seconds > 0:
+                await asyncio.sleep(wait_seconds)
+
             try:
-                await self._execute_fetch_cycle()
-                await asyncio.sleep(self._interval)
+                results = await self._execute_fetch_cycle(self._fetchers)
+
+                failed_fetchers = [
+                    fetcher
+                    for fetcher, result in zip(self._fetchers, results)
+                    if not result or isinstance(result, Exception)
+                ]
+
+                if failed_fetchers:
+                    logging.info(
+                        f"Retrying after 2s for {len(failed_fetchers)} failed symbols..."
+                    )
+                    await asyncio.sleep(2.0)
+                    await self._execute_fetch_cycle(failed_fetchers)
+
             except Exception as e:
-                logging.error(f"Error during polling: {e}")
-                await asyncio.sleep(self._interval)
+                logging.error(
+                    f"An unexpected error occurred in the polling loop: {e}"
+                )
 
-    async def _execute_fetch_cycle(self) -> None:
-        fetch_tasks = [fetcher.fetch_data() for fetcher in self._fetchers]
-        results = await asyncio.gather(*fetch_tasks, return_exceptions=True)
+    async def _execute_fetch_cycle(
+        self, fetchers_to_process: List[PriceFetcher]
+    ) -> List[Any]:
+        results = []
+        if not fetchers_to_process:
+            return results
 
-        for result in results:
-            if isinstance(result, dict) and result:
-                pass
+        for fetcher in fetchers_to_process:
+            try:
+                result = await fetcher.fetch_data()
+                results.append(result)
+            except Exception as e:
+                logging.error(
+                    f"Failed to fetch data for symbol '{fetcher.symbol}': {e}"
+                )
+                results.append(e)
+            finally:
+                await asyncio.sleep(0.5)
 
-        self._fetch_count += len(self._fetchers)
+        self._fetch_count += len(fetchers_to_process)
+        if self._fetch_count > 0 and self._fetch_count % 20 == 0:
+            logging.debug(f"Completed {self._fetch_count} total fetches.")
 
-        if self._fetch_count % 20 == 0:
-            logging.debug(f"Completed {self._fetch_count} fetches")
+        return results
 
     def stop(self) -> None:
         self._running = False
@@ -44,4 +78,4 @@ class PollingManager:
 
     @property
     def fetch_count(self) -> int:
-        return self._fetch_count 
+        return self._fetch_count

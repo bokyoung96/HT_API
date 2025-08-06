@@ -22,7 +22,7 @@ class CandleData:
         return {
             "symbol": self.symbol,
             "timestamp": self.timestamp.isoformat(),
-            "timeframe": f"{self.timeframe}m",
+            "timeframe": self.timeframe,
             "open": self.open,
             "high": self.high,
             "low": self.low,

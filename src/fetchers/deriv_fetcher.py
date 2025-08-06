@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -77,9 +77,28 @@ class DerivPriceFetcher(PriceFetcher):
         if not candle:
             return None
 
+        candle_date = candle.get("stck_bsop_date")
+        candle_time = candle.get("stck_cntg_hour")
+
+        if not candle_date or not candle_time:
+            logging.warning(f"Missing date/time in candle data for {self.symbol}: {candle}")
+            return None
+
+        try:
+            timestamp_dt = datetime.strptime(f"{candle_date}{candle_time}", "%Y%m%d%H%M%S")
+            # NOTE: Characteristics of HT API
+            timestamp_dt += timedelta(minutes=1) 
+
+            kst = timezone(timedelta(hours=9))
+            timestamp_kst = timestamp_dt.replace(tzinfo=kst)
+
+        except ValueError:
+            logging.error(f"Could not parse timestamp from candle data: {candle}")
+            return None
+
         return CandleData(
             symbol=self.symbol,
-            timestamp=datetime.now().replace(second=0, microsecond=0),
+            timestamp=timestamp_kst,
             timeframe=self.timeframe,
             open=float(candle.get("futs_oprc", 0)),
             high=float(candle.get("futs_hgpr", 0)),

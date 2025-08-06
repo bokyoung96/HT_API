@@ -1,21 +1,23 @@
 # NOTE: 1m futures data
-FUTURES_1M_TABLE = """
-CREATE TABLE IF NOT EXISTS futures_1m (
+def create_futures_table_sql(symbol: str) -> str:
+    # Use first 3 chars for table name (e.g., 101W09 -> 101)
+    table_name_suffix = symbol[:3].lower()
+    table_name = f"futures_{table_name_suffix}"
+    return f"""
+CREATE TABLE IF NOT EXISTS {table_name} (
     id SERIAL PRIMARY KEY,
     timestamp TIMESTAMPTZ NOT NULL,
     symbol VARCHAR(20) NOT NULL,
-    timeframe INTEGER NOT NULL,
     open NUMERIC(10,2) NOT NULL,
     high NUMERIC(10,2) NOT NULL,
     low NUMERIC(10,2) NOT NULL,
     close NUMERIC(10,2) NOT NULL,
     volume BIGINT NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(timestamp, symbol, timeframe)
+    UNIQUE(timestamp, symbol)
 );
 
-CREATE INDEX IF NOT EXISTS idx_futures_1m_timestamp ON futures_1m(timestamp);
-CREATE INDEX IF NOT EXISTS idx_futures_1m_symbol ON futures_1m(symbol);
+CREATE INDEX IF NOT EXISTS idx_{table_name}_timestamp ON {table_name}(timestamp);
+CREATE INDEX IF NOT EXISTS idx_{table_name}_symbol ON {table_name}(symbol);
 """
 
 # NOTE: 1m stocks data
@@ -67,13 +69,15 @@ CREATE INDEX IF NOT EXISTS idx_option_chain_strike ON option_chain_raw(strike_pr
 CREATE INDEX IF NOT EXISTS idx_option_chain_atm_class ON option_chain_raw(atm_class);
 """
 
-# NOTE: option matrices data
-OPTION_MATRICES_TABLE = """
-CREATE TABLE IF NOT EXISTS option_matrices (
+# NOTE:1m option matrices
+def create_option_matrices_table_sql(underlying_symbol: str) -> str:
+    table_name = f"option_matrices_{underlying_symbol.lower()}"
+    return f"""
+CREATE TABLE IF NOT EXISTS {table_name} (
     id SERIAL PRIMARY KEY,
     timestamp TIMESTAMPTZ NOT NULL,
-    underlying_symbol VARCHAR(20) NOT NULL,
-    metric_type VARCHAR(10) NOT NULL, -- 'iv', 'delta', 'gamma', 'vega', 'theta', 'rho'
+    underlying_symbol VARCHAR(50) NOT NULL,
+    metric_type VARCHAR(20) NOT NULL,
     
     -- Call Options
     c_itm10 NUMERIC(8,4), c_itm9 NUMERIC(8,4), c_itm8 NUMERIC(8,4), c_itm7 NUMERIC(8,4), c_itm6 NUMERIC(8,4),
@@ -93,8 +97,8 @@ CREATE TABLE IF NOT EXISTS option_matrices (
     UNIQUE(timestamp, underlying_symbol, metric_type)
 );
 
-CREATE INDEX IF NOT EXISTS idx_option_matrices_timestamp ON option_matrices(timestamp);
-CREATE INDEX IF NOT EXISTS idx_option_matrices_metric ON option_matrices(metric_type);
+CREATE INDEX IF NOT EXISTS idx_{table_name}_timestamp ON {table_name}(timestamp);
+CREATE INDEX IF NOT EXISTS idx_{table_name}_metric ON {table_name}(metric_type);
 """
 
 # NOTE: system status and log data
@@ -113,11 +117,9 @@ CREATE INDEX IF NOT EXISTS idx_system_status_timestamp ON system_status(timestam
 CREATE INDEX IF NOT EXISTS idx_system_status_component ON system_status(component);
 """
 
-# NOTE: all tables
-ALL_TABLES = [
-    FUTURES_1M_TABLE,
+# NOTE: static tables
+ALL_STATIC_TABLES = [
     STOCKS_1M_TABLE,
     OPTION_CHAIN_RAW_TABLE,
-    OPTION_MATRICES_TABLE,
     SYSTEM_STATUS_TABLE
 ]
