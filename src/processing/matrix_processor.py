@@ -99,4 +99,31 @@ class OptionMatrixProcessor:
 
         for i, option in enumerate(otm_options[: self._num_strikes]):
             for metric in self._metrics:
-                new_rows[metric][f"{side}_OTM{i+1}"] = getattr(option, metric, None) 
+                new_rows[metric][f"{side}_OTM{i+1}"] = getattr(option, metric, None)
+                
+    def get_current_matrices(self) -> Dict[str, Dict[str, Dict[str, float]]]:
+        if not any(len(df) > 0 for df in self.matrices.values()):
+            return {}
+            
+        result = {}
+        for metric, df in self.matrices.items():
+            if len(df) == 0:
+                continue
+                
+            latest_row = df.iloc[-1]
+            result[metric] = {
+                "c": {},
+                "p": {}
+            }
+            
+            for col in df.columns:
+                value = latest_row[col]
+                if pd.notna(value):
+                    if col.startswith("C_"):
+                        key = col[2:].lower()
+                        result[metric]["c"][key] = float(value)
+                    elif col.startswith("P_"):
+                        key = col[2:].lower()
+                        result[metric]["p"][key] = float(value)
+                        
+        return result 

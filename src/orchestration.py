@@ -33,6 +33,10 @@ class DataFeedOrchestrator:
         self._client = client
         self._data_feed: Optional[DataFeed] = None
         self._data_processor: Optional[DataProcessorProtocol] = None
+        self._data_writer = None
+        
+    def set_data_writer(self, data_writer):
+        self._data_writer = data_writer
 
     async def start(self) -> None:
         subscriptions = self._subscription_manager.get_subscriptions()
@@ -67,12 +71,18 @@ class DataFeedOrchestrator:
             return
 
         self._data_feed = KISDataFeed(self._config, self._auth, fetchers)
-        self._data_processor = DataProcessor(shared_queue)
+        self._data_processor = DataProcessor(shared_queue, self._data_writer)
 
-        feed_task = asyncio.create_task(self._data_feed.start_feed())
-        processor_task = asyncio.create_task(self._data_processor.process_data())
+        tasks = [
+            asyncio.create_task(self._data_feed.start_feed()),
+            asyncio.create_task(self._data_processor.process_data())
+        ]
+        
+        if self._data_writer:
+            tasks.append(asyncio.create_task(self._data_writer.start_batch_writer()))
+            logging.info("✅ Database writer started")
 
-        await asyncio.gather(feed_task, processor_task)
+        await asyncio.gather(*tasks)
 
 
 class DataFeedBuilder:

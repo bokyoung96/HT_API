@@ -1,5 +1,0 @@
-# Database and Supabase packages
-asyncpg==0.29.0          # PostgreSQL async driver  
-supabase==2.3.4          # Supabase Python client
-python-dotenv==1.0.0     # Environment variables
-sqlalchemy==2.0.25       # SQL toolkit (optional, for complex queries) 

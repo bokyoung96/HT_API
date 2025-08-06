@@ -46,6 +46,7 @@ class FetcherRegistry:
                 sub_config.timeframe,
                 sub_config.maturity,
                 sub_config.underlying_asset_type,
+                sub_config.display_name,
             )
         return fetcher_class(
             queue, config, auth, client, sub_config.symbol, sub_config.timeframe

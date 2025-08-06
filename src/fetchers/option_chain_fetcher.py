@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, Optional
 
 import httpx
@@ -21,12 +21,14 @@ class OptionChainFetcher(PriceFetcher):
         timeframe: int,
         maturity: Optional[str],
         underlying_asset_type: Optional[str],
+        display_name: Optional[str] = None,
     ):
         super().__init__(
             queue, config, auth, client, symbol, timeframe, MarketType.DERIVATIVES
         )
         self.maturity = maturity
         self.underlying_asset_type = underlying_asset_type
+        self.display_name = display_name
         self._last_fetch_minute: Optional[str] = None
 
     async def fetch_data(self) -> Dict[str, Any]:
@@ -77,9 +79,12 @@ class OptionChainFetcher(PriceFetcher):
         calls = [self._process_option_data(o) for o in calls_raw]
         puts = [self._process_option_data(o) for o in puts_raw]
 
+        # Create underlying_symbol from maturity
+        underlying_symbol = f"{self.maturity}_KOSPI200" if self.maturity else "unknown"
+        
         chain_data = OptionChainData(
-            timestamp=datetime.now(),
-            underlying_symbol=self.underlying_asset_type or "",
+            timestamp=datetime.now(timezone(timedelta(hours=9))),
+            underlying_symbol=underlying_symbol,
             underlying_price=underlying_price,
             calls=[c for c in calls if c],
             puts=[p for p in puts if p],

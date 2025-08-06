@@ -1,7 +1,9 @@
 from __future__ import annotations
 import asyncio
 from abc import ABC, abstractmethod
+from datetime import datetime, timezone, timedelta
 from typing import TYPE_CHECKING, Any, Dict, Optional
+import logging
 
 from processing.processors import CandleProcessor
 from utils import is_market_open
@@ -55,9 +57,12 @@ class PriceFetcher(ABC):
         completed_candle: Optional[Dict],
         log_format: str,
     ) -> Dict[str, Any]:
-        return await self._candle_processor.process_candle_data(
+        
+        processed_candle_data = await self._candle_processor.process_candle_data(
             current_time, completed_candle, log_format, self._process_candle_data
         )
+
+        return processed_candle_data
 
     @abstractmethod
     def _process_candle_data(self, candle: Dict) -> Optional[CandleData]:
