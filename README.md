@@ -1,4 +1,4 @@
-## korea realtime trading : Trading Data Pipeline & Strategy Engine
+## Korea realtime trading : Trading Data Pipeline & Strategy Engine
 
 🚀 **Advanced real-time market data collection and algorithmic trading system** built with Korea Investment Securities API integration, featuring asynchronous data processing, automated trading strategies, and enterprise-grade database management.
 
