@@ -1,10 +1,10 @@
-# HT_API - Real-Time Trading Data Pipeline & Strategy Engine
+## korea realtime trading : Trading Data Pipeline & Strategy Engine
 
 🚀 **Advanced real-time market data collection and algorithmic trading system** built with Korea Investment Securities API integration, featuring asynchronous data processing, automated trading strategies, and enterprise-grade database management.
 
 ## 🎯 Project Overview
 
-**HT_API** is a production-ready financial technology system that implements real-time market data collection, processing, and algorithmic trading strategies using the Korea Investment Securities (KIS) API. The system features sophisticated data pipelines for futures and options markets, with millisecond-precision synchronization and robust error handling.
+**korea_realtime_trading** is a production-ready financial technology system that implements real-time market data collection, processing, and algorithmic trading strategies using the Korea Investment Securities (KIS) API. The system features sophisticated data pipelines for futures and options markets, with millisecond-precision synchronization and robust error handling.
 
 ### Key Technical Achievements
 
