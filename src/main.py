@@ -1,12 +1,29 @@
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, time
 
 import httpx
 from base import KISAuth, KISConfig, setup_logging
 from orchestration import DataFeedBuilder
 from database import DatabaseConfig, DatabaseConnection, DataWriter
 
+
+async def wait_for_market_open():
+    now = datetime.now()
+    current_time = now.time()
+    market_open = time(8, 45)
+    
+    if current_time < market_open:
+        market_open_datetime = datetime.combine(now.date(), market_open)
+        wait_seconds = (market_open_datetime - now).total_seconds()
+        
+        print(f"⏰ Market opens at 08:45. Waiting {wait_seconds:.0f} seconds...")
+        print(f"🕐 Current time: {now.strftime('%H:%M:%S')}")
+        print(f"⏳ Market open time: {market_open_datetime.strftime('%H:%M:%S')}")
+        print("━" * 50)
+        
+        await asyncio.sleep(wait_seconds)
+        print("🟢 Market is now open! Starting data feed...")
 
 async def main():
     logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -19,6 +36,8 @@ async def main():
     print("🏢 Stock market hours: 09:00 ~ 15:30")
     print("📈 Derivatives market hours: 08:45 ~ 15:45")
     print("━" * 50)
+    
+    await wait_for_market_open()
     
     db_config = DatabaseConfig.from_json("db_config.json")
     db_connection = DatabaseConnection(db_config)

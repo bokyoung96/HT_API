@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Tuple
+from typing import Dict, Any
 import os
 import sys
 import pandas as pd
@@ -14,14 +14,16 @@ from database.config import DatabaseConfig
 
 class SignalGenerator:
     def __init__(self, 
-                 atr_period: int = 14,
-                 rolling_move: int = 30,
+                 atr_period: int = 10,
+                 rolling_move: int = 5,
                  band_multiplier: float = 1.0,
-                 use_vwap: bool = True):
+                 use_vwap: bool = True,
+                 observe_interval_minutes: int = 5):
         self.atr_period = atr_period
         self.rolling_move = rolling_move
         self.band_multiplier = band_multiplier
         self.use_vwap = use_vwap
+        self.observe_interval_minutes = observe_interval_minutes
         
     def create_features(self, df: pd.DataFrame) -> pd.DataFrame:
         if len(df) < 100:
@@ -30,9 +32,25 @@ class SignalGenerator:
         df = df.copy()
         df['day'] = df['timestamp'].dt.date
         
+        unique_days = df['day'].nunique()
+        date_range = f"{df['day'].min()} ~ {df['day'].max()}"
+        logging.info(f"📊 Feature creation - Total records: {len(df)}, Unique days: {unique_days}, Date range: {date_range}")
+        
+        day_counts = df['day'].value_counts().sort_index()
+        logging.debug(f"📅 Records per day: {dict(day_counts.tail(5))}")
+        
         df['vwap'] = self._calculate_vwap(df)
         df['atr'] = self._calculate_atr(df)
         df['sigma_open'] = self._calculate_sigma_open(df)
+        
+        nan_count = df['sigma_open'].isna().sum()
+        if nan_count > 0:
+            logging.warning(f"⚠️ sigma_open has {nan_count} NaN values (need at least {self.rolling_move} days)")
+            first_valid_idx = df['sigma_open'].first_valid_index()
+            if first_valid_idx is not None:
+                first_valid_date = df.loc[first_valid_idx, 'day']
+                logging.info(f"📅 First valid sigma_open date: {first_valid_date}")
+        
         df = self._calculate_bands(df)
         
         return df
@@ -50,16 +68,20 @@ class SignalGenerator:
         return true_range.rolling(window=self.atr_period).mean()
         
     def _calculate_sigma_open(self, df: pd.DataFrame) -> pd.Series:
-        daily_data = df.groupby('day').agg({
-            'open': 'first',
-            'close': 'last'
-        }).reset_index()
+        if df['timestamp'].dt.tz is not None:
+            df['timestamp_local'] = df['timestamp'].dt.tz_convert('Asia/Seoul')
+        else:
+            df['timestamp_local'] = df['timestamp']
+            
+        df['min_from_open'] = ((df['timestamp_local'] - df['timestamp_local'].dt.normalize()) / pd.Timedelta(minutes=1)) - 525  # 08:45
+        df['move_open'] = df.groupby('day')['close'].transform(lambda x: (x / x.iloc[0] - 1).abs() if len(x) > 0 else 0)
+        df['sigma_open'] = df.groupby('min_from_open')['move_open'].transform(
+            lambda x: x.rolling(window=self.rolling_move, min_periods=max(self.rolling_move//2, 3)).mean().shift(1)
+        )
         
-        daily_data['daily_move'] = abs(daily_data['close'] - daily_data['open']) / daily_data['open']
-        daily_data['sigma_open'] = daily_data['daily_move'].rolling(window=self.rolling_move).std()
+        df['sigma_open'] = df.groupby('day')['sigma_open'].ffill().bfill()
         
-        day_to_sigma = dict(zip(daily_data['day'], daily_data['sigma_open']))
-        return df['day'].map(day_to_sigma)
+        return df['sigma_open']
         
     def _calculate_bands(self, df: pd.DataFrame) -> pd.DataFrame:
         open_price = df.groupby('day')['open'].transform('first')
@@ -73,26 +95,64 @@ class SignalGenerator:
         
         return df
         
-    def get_latest_signal(self, df: pd.DataFrame) -> Tuple[int, str]:
+    def get_latest_signal(self, df: pd.DataFrame) -> Dict[str, Any]:
+        from datetime import datetime
+        
         df_with_features = self.create_features(df)
         
         if df_with_features.empty:
-            return 0, "insufficient_data"
+            return {
+                'monitor_signal': 0, 
+                'trade_signal': 0, 
+                'reason': 'insufficient_data',
+                'ub': None, 'lb': None, 'current_price': None,
+                'is_observe_time': False
+            }
             
-        latest_row = df_with_features.iloc[-1]
+        valid_rows = df_with_features[df_with_features['UB'].notna() & df_with_features['LB'].notna()]
         
-        if pd.isna(latest_row.UB) or pd.isna(latest_row.LB):
-            return 0, "insufficient_data"
+        if valid_rows.empty:
+            unique_days = df['timestamp'].dt.date.nunique() if 'timestamp' in df else 0
+            return {
+                'monitor_signal': 0, 
+                'trade_signal': 0, 
+                'reason': f'insufficient_data_days_{unique_days}',
+                'ub': None, 'lb': None, 'current_price': None,
+                'is_observe_time': False
+            }
             
-        # Entry signals
+        latest_row = valid_rows.iloc[-1]
+        
+        current_time = datetime.now()
+        is_observe_time = (current_time.minute % self.observe_interval_minutes == 0)
+        
+        monitor_signal = 0
+        reason = "none"
+        
         if latest_row.close > latest_row.UB:
             if not self.use_vwap or latest_row.close > latest_row.vwap:
-                return 1, "band_cross_up"
+                monitor_signal = 1
+                reason = "band_cross_up"
         elif latest_row.close < latest_row.LB:
             if not self.use_vwap or latest_row.close < latest_row.vwap:
-                return -1, "band_cross_down"
+                monitor_signal = -1
+                reason = "band_cross_down"
+        
+        trade_signal = monitor_signal if is_observe_time else 0
                 
-        return 0, "none"
+        return {
+            'monitor_signal': monitor_signal,
+            'trade_signal': trade_signal, 
+            'reason': reason,
+            'ub': float(latest_row.UB),
+            'lb': float(latest_row.LB),
+            'current_price': float(latest_row.close),
+            'is_observe_time': is_observe_time,
+            'atr': float(latest_row.atr),
+            'move_open': float(latest_row.move_open),
+            'sigma_open': float(latest_row.sigma_open),
+            'vwap': float(latest_row.vwap)
+        }
 
 class SignalDatabase:
     def __init__(self, table_name: str = "dolpha1_signal"):
@@ -110,38 +170,62 @@ class SignalDatabase:
     async def _create_signal_table(self):
         try:
             async with self.db_connection.pool.acquire() as conn:
+                # NOTE: Will be removed after testing
+                await conn.execute(f"DROP TABLE IF EXISTS {self.table_name}")
+                
                 table_sql = f"""
-                CREATE TABLE IF NOT EXISTS {self.table_name} (
+                CREATE TABLE {self.table_name} (
                     timestamp TIMESTAMPTZ NOT NULL,
                     symbol TEXT NOT NULL,
                     close DOUBLE PRECISION,
-                    signal INTEGER,
+                    monitor_signal INTEGER,
+                    trade_signal INTEGER,
                     reason TEXT,
+                    ub DOUBLE PRECISION,
+                    lb DOUBLE PRECISION,
+                    atr DOUBLE PRECISION,
+                    move_open DOUBLE PRECISION,
+                    sigma_open DOUBLE PRECISION,
+                    vwap DOUBLE PRECISION,
                     created_at TIMESTAMPTZ DEFAULT NOW(),
                     PRIMARY KEY (timestamp, symbol)
                 );
                 """
                 await conn.execute(table_sql)
-                logging.info(f"✅ {self.table_name} table ready")
+                logging.info(f"✅ {self.table_name} table recreated with new schema")
         except Exception as e:
             logging.error(f"❌ Failed to create signal table: {e}")
             raise
             
-    async def save_signal(self, timestamp, symbol, close, signal, reason):
-        if signal == 0:
-            return
-            
+    async def save_signal(self, timestamp, symbol, signal_data: Dict[str, Any]):
         try:
             async with self.db_connection.pool.acquire() as conn:
                 await conn.execute(f"""
-                    INSERT INTO {self.table_name} (timestamp, symbol, close, signal, reason)
-                    VALUES ($1, $2, $3, $4, $5)
+                    INSERT INTO {self.table_name} (
+                        timestamp, symbol, close, monitor_signal, trade_signal, 
+                        reason, ub, lb, atr, move_open, sigma_open, vwap
+                    )
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
                     ON CONFLICT (timestamp, symbol) DO UPDATE SET
-                        close = EXCLUDED.close, signal = EXCLUDED.signal, reason = EXCLUDED.reason;
-                """, [timestamp, symbol, close, signal, reason])
+                        close = EXCLUDED.close, 
+                        monitor_signal = EXCLUDED.monitor_signal, 
+                        trade_signal = EXCLUDED.trade_signal, 
+                        reason = EXCLUDED.reason, 
+                        ub = EXCLUDED.ub, 
+                        lb = EXCLUDED.lb,
+                        atr = EXCLUDED.atr,
+                        move_open = EXCLUDED.move_open,
+                        sigma_open = EXCLUDED.sigma_open,
+                        vwap = EXCLUDED.vwap;
+                """, 
+                    timestamp, symbol, signal_data['current_price'], 
+                    signal_data['monitor_signal'], signal_data['trade_signal'], 
+                    signal_data['reason'], signal_data['ub'], signal_data['lb'],
+                    signal_data['atr'], signal_data['move_open'], 
+                    signal_data['sigma_open'], signal_data['vwap']
+                )
             
-            signal_type = "🟢 LONG" if signal == 1 else "🔴 SHORT"
-            logging.info(f"🚨 {signal_type} SIGNAL: {close} ({reason})")
+            logging.debug(f"💾 Signal saved: Monitor={signal_data['monitor_signal']}, Trade={signal_data['trade_signal']} at {signal_data['current_price']:.2f}")
         except Exception as e:
             logging.error(f"❌ Failed to save signal: {e}")
             

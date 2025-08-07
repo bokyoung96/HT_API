@@ -117,39 +117,9 @@ CREATE INDEX IF NOT EXISTS idx_system_status_timestamp ON system_status(timestam
 CREATE INDEX IF NOT EXISTS idx_system_status_component ON system_status(component);
 """
 
-# NOTE: dolpha1 signal table
-DOLPHA1_SIGNAL_TABLE = """
-CREATE TABLE IF NOT EXISTS dolpha1_signal (
-    timestamp TIMESTAMPTZ NOT NULL,
-    symbol TEXT NOT NULL,
-    open DOUBLE PRECISION,
-    high DOUBLE PRECISION,
-    low DOUBLE PRECISION,
-    close DOUBLE PRECISION,
-    volume BIGINT,
-    vwap DOUBLE PRECISION,
-    atr DOUBLE PRECISION,
-    sigma_open DOUBLE PRECISION,
-    ub DOUBLE PRECISION,
-    lb DOUBLE PRECISION,
-    entry_signal INTEGER,
-    entry_reason TEXT,
-    exit_signal INTEGER,
-    exit_reason TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    PRIMARY KEY (timestamp, symbol)
-);
-
-CREATE INDEX IF NOT EXISTS idx_dolpha1_signal_timestamp ON dolpha1_signal(timestamp);
-CREATE INDEX IF NOT EXISTS idx_dolpha1_signal_symbol ON dolpha1_signal(symbol);
-CREATE INDEX IF NOT EXISTS idx_dolpha1_signal_entry_signal ON dolpha1_signal(entry_signal);
-CREATE INDEX IF NOT EXISTS idx_dolpha1_signal_exit_signal ON dolpha1_signal(exit_signal);
-"""
-
 # NOTE: static tables
 ALL_STATIC_TABLES = [
     STOCKS_1M_TABLE,
     OPTION_CHAIN_RAW_TABLE,
     SYSTEM_STATUS_TABLE,
-    DOLPHA1_SIGNAL_TABLE
 ]

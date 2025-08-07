@@ -33,11 +33,12 @@ class PollingManager:
                 ]
 
                 if failed_fetchers:
-                    for i in range(5):
-                        logging.info(
-                            f"Retrying after 2s for {len(failed_fetchers)} failed symbols... (Attempt {i+1}/5)"
+                    for i in range(10):
+                        sleep_time = 2.0 + (i * 0.3) if i < 5 else 4.0
+                        logging.warning(
+                            f"🔄 Retrying after {sleep_time:.1f}s for {len(failed_fetchers)} failed symbols... (Attempt {i+1}/10)"
                         )
-                        await asyncio.sleep(2.0)
+                        await asyncio.sleep(sleep_time)
                         results = await self._execute_fetch_cycle(failed_fetchers)
                         
                         failed_fetchers = [
@@ -47,7 +48,12 @@ class PollingManager:
                         ]
 
                         if not failed_fetchers:
+                            logging.info(f"✅ All fetchers recovered after {i+1} attempts")
                             break
+                    
+                    if failed_fetchers:
+                        failed_symbols = [f.symbol for f in failed_fetchers]
+                        logging.error(f"❌ {len(failed_fetchers)} fetchers still failing after 10 attempts: {failed_symbols}")
 
             except Exception as e:
                 logging.error(
