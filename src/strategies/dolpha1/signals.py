@@ -30,6 +30,8 @@ class SignalGenerator:
             return pd.DataFrame()
             
         df = df.copy()
+        df = df.sort_values('timestamp').reset_index(drop=True)
+
         df['day'] = df['timestamp'].dt.date
         
         unique_days = df['day'].nunique()
@@ -58,7 +60,12 @@ class SignalGenerator:
     @staticmethod
     def _calculate_vwap(df: pd.DataFrame) -> pd.Series:
         typical_price = (df['high'] + df['low'] + df['close']) / 3
-        return (typical_price * df['volume']).cumsum() / df['volume'].cumsum()
+        tpv = typical_price * df['volume']
+
+        cumulative_tpv_daily = tpv.groupby(df['day']).cumsum()
+        cumulative_volume_daily = df.groupby('day')['volume'].cumsum()
+        
+        return cumulative_tpv_daily / cumulative_volume_daily
         
     def _calculate_atr(self, df: pd.DataFrame) -> pd.Series:
         high_low = df['high'] - df['low']
@@ -68,13 +75,12 @@ class SignalGenerator:
         return true_range.rolling(window=self.atr_period).mean()
         
     def _calculate_sigma_open(self, df: pd.DataFrame) -> pd.Series:
-        if df['timestamp'].dt.tz is not None:
-            df['timestamp_local'] = df['timestamp'].dt.tz_convert('Asia/Seoul')
-        else:
-            df['timestamp_local'] = df['timestamp']
-            
-        df['min_from_open'] = ((df['timestamp_local'] - df['timestamp_local'].dt.normalize()) / pd.Timedelta(minutes=1)) - 525  # 08:45
-        df['move_open'] = df.groupby('day')['close'].transform(lambda x: (x / x.iloc[0] - 1).abs() if len(x) > 0 else 0)
+        df['timestamp_local'] = df['timestamp']
+
+        base_open_price = df.groupby('day')['open'].transform('first')            
+        df['min_from_open'] = ((df['timestamp_local'] - df['timestamp_local'].dt.normalize()) / pd.Timedelta(minutes=1)) - 526  # 08:46
+        df['move_open'] = (df['close'] / base_open_price - 1).abs()
+        
         df['sigma_open'] = df.groupby('min_from_open')['move_open'].transform(
             lambda x: x.rolling(window=self.rolling_move, min_periods=max(self.rolling_move//2, 3)).mean().shift(1)
         )
@@ -151,7 +157,8 @@ class SignalGenerator:
             'atr': float(latest_row.atr),
             'move_open': float(latest_row.move_open),
             'sigma_open': float(latest_row.sigma_open),
-            'vwap': float(latest_row.vwap)
+            'vwap': float(latest_row.vwap),
+            'min_from_open': float(latest_row.min_from_open)
         }
 
 class SignalDatabase:
@@ -175,7 +182,7 @@ class SignalDatabase:
                 
                 table_sql = f"""
                 CREATE TABLE {self.table_name} (
-                    timestamp TIMESTAMPTZ NOT NULL,
+                    timestamp TIMESTAMP NOT NULL,
                     symbol TEXT NOT NULL,
                     close DOUBLE PRECISION,
                     monitor_signal INTEGER,
@@ -187,7 +194,8 @@ class SignalDatabase:
                     move_open DOUBLE PRECISION,
                     sigma_open DOUBLE PRECISION,
                     vwap DOUBLE PRECISION,
-                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    min_from_open DOUBLE PRECISION,
+                    created_at TIMESTAMP DEFAULT NOW(),
                     PRIMARY KEY (timestamp, symbol)
                 );
                 """
@@ -203,9 +211,9 @@ class SignalDatabase:
                 await conn.execute(f"""
                     INSERT INTO {self.table_name} (
                         timestamp, symbol, close, monitor_signal, trade_signal, 
-                        reason, ub, lb, atr, move_open, sigma_open, vwap
+                        reason, ub, lb, atr, move_open, sigma_open, vwap, min_from_open
                     )
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
                     ON CONFLICT (timestamp, symbol) DO UPDATE SET
                         close = EXCLUDED.close, 
                         monitor_signal = EXCLUDED.monitor_signal, 
@@ -216,13 +224,15 @@ class SignalDatabase:
                         atr = EXCLUDED.atr,
                         move_open = EXCLUDED.move_open,
                         sigma_open = EXCLUDED.sigma_open,
-                        vwap = EXCLUDED.vwap;
+                        vwap = EXCLUDED.vwap,
+                        min_from_open = EXCLUDED.min_from_open;
                 """, 
                     timestamp, symbol, signal_data['current_price'], 
                     signal_data['monitor_signal'], signal_data['trade_signal'], 
                     signal_data['reason'], signal_data['ub'], signal_data['lb'],
                     signal_data['atr'], signal_data['move_open'], 
-                    signal_data['sigma_open'], signal_data['vwap']
+                    signal_data['sigma_open'], signal_data['vwap'],
+                    signal_data['min_from_open']
                 )
             
             logging.debug(f"💾 Signal saved: Monitor={signal_data['monitor_signal']}, Trade={signal_data['trade_signal']} at {signal_data['current_price']:.2f}")

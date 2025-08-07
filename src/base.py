@@ -67,8 +67,31 @@ class KISAuth:
                     expires_str = data.get("expires_at")
                     if expires_str:
                         self._token_expires_at = datetime.fromisoformat(expires_str)
+                        
+                        if self._should_refresh_token():
+                            self._clear_token()
+                            logging.info("🗑️ Access token will expire within 12 hour - deleted for refresh")
         except Exception as e:
             logging.warning(f"Failed to load saved token: {e}")
+
+    def _should_refresh_token(self) -> bool:
+        if not self._token_expires_at:
+            return True
+        
+        now = datetime.now()
+        time_until_expiry = self._token_expires_at - now
+        return time_until_expiry <= timedelta(hours=12)
+
+    def _clear_token(self):
+        try:
+            if os.path.exists(self._token_file):
+                os.remove(self._token_file)
+                logging.info(f"🗑️ Deleted existing access_token.json")
+        except Exception as e:
+            logging.warning(f"Failed to delete access_token.json: {e}")
+        
+        self._access_token = None
+        self._token_expires_at = None
 
     def _save_token(self):
         try:
@@ -82,6 +105,9 @@ class KISAuth:
             logging.error(f"Failed to save token: {e}")
 
     async def get_access_token(self) -> str:
+        if self._should_refresh_token():
+            self._clear_token()
+        
         if self._access_token and self._token_expires_at and datetime.now() < self._token_expires_at:
             return self._access_token
         
