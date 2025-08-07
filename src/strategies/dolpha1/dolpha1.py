@@ -6,16 +6,13 @@ from typing import Any, Dict
 
 import os
 import sys
-import httpx
 
 warnings.filterwarnings('ignore', category=UserWarning, module='pandas_market_calendars')
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(PROJECT_ROOT)
 
-from base import KISAuth, KISConfig, setup_logging
-from orchestration import DataFeedBuilder
-from database import DatabaseConfig, DatabaseConnection, DataWriter
+from base import KISConfig, setup_logging
 from feeder import RealTimeDataFeeder
 from signals import SignalGenerator, SignalDatabase
 
@@ -38,42 +35,51 @@ class Dolpha1Strategy:
         logging.info("🚀 dolpha1 system initialization complete")
 
     async def start_realtime_feed(self):
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            auth = KISAuth(self.config, client)
-            
-            builder = (
-                DataFeedBuilder(self.config, auth, client)
-                .add_deriv(self.symbol, timeframe=1, name="KOSDAQ150 Futures")
-            )
-            
-            orchestrator = builder.build()
-            
-            class CustomDataWriter:
-                def __init__(self, system):
-                    self.system = system
-                    
-                async def write_derivatives_data(self, data):
-                    await self.system.feeder.save_data(data)
-                    await self.system._check_signal()
-                    
-            orchestrator.set_data_writer(CustomDataWriter(self))
-            await orchestrator.start()
+        await self.feeder.start_realtime_feed(data_handler=self._on_realtime_data)
+        
+    async def _on_realtime_data(self, candle_data):
+        await self._check_signal()
             
     async def _check_signal(self):
         current_time = datetime.now()
+        current_hour_min = current_time.strftime('%H:%M')
         
-        if (self.last_signal_time is None or 
-            (current_time - self.last_signal_time).total_seconds() >= 60):
+        if current_hour_min < '08:45' or current_hour_min >= '15:47':
+            logging.debug(f"🕐 Signal check skipped - outside trading hours: {current_hour_min}")
+            return
+        
+        if True:
             
+            logging.debug(f"🔍 Checking for signals at {current_time.strftime('%H:%M:%S')}")
             recent_data = await self._get_recent_data()
+            
             if len(recent_data) >= 100:
-                signal, reason = self.signal_generator.get_latest_signal(recent_data)
-                if signal != 0:
+                signal_result = self.signal_generator.get_latest_signal(recent_data)
+                
+                monitor_signal = signal_result['monitor_signal']
+                trade_signal = signal_result['trade_signal'] 
+                reason = signal_result['reason']
+                ub = signal_result['ub']
+                lb = signal_result['lb']
+                current_price = signal_result['current_price']
+                is_observe_time = signal_result['is_observe_time']
+                
+                if ub is not None and lb is not None:
+                    observe_mark = "🎯" if is_observe_time else "📊"
+                    logging.info(f"{observe_mark} Price: {current_price:.2f} | UB: {ub:.2f} | LB: {lb:.2f} | Monitor: {monitor_signal} | Trade: {trade_signal} | {reason}")
+                else:
+                    logging.info(f"📊 Signal check - Data points: {len(recent_data)}, Reason: {reason}")
+                
+                if not reason.startswith("insufficient_data"):
                     latest_row = recent_data.iloc[-1]
                     await self.signal_database.save_signal(
-                        latest_row['timestamp'], latest_row['symbol'], 
-                        latest_row['close'], signal, reason
+                        latest_row['timestamp'], latest_row['symbol'], signal_result
                     )
+                    
+                    if is_observe_time and trade_signal != 0:
+                        logging.info(f"🚨 TRADE SIGNAL! {trade_signal} at {current_price:.2f} - {reason}")
+            else:
+                logging.warning(f"⚠️ Insufficient data for signal generation: {len(recent_data)}/100")
             
             self.last_signal_time = current_time
             
@@ -85,7 +91,7 @@ class Dolpha1Strategy:
                     FROM {self.feeder.table_name}
                     WHERE symbol = $1
                     ORDER BY timestamp DESC
-                    LIMIT 1000
+                    LIMIT 10000
                 """
                 records = await conn.fetch(query, self.symbol)
                 
@@ -105,11 +111,13 @@ class Dolpha1Strategy:
         await self.signal_database.close()
 
 async def main():
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    config = KISConfig("config.json")
-    setup_logging(config.config_dir)
+    try:
+        logging.getLogger("httpx").setLevel(logging.WARNING)
+        config_path = os.path.join(PROJECT_ROOT, "config.json")
+        config = KISConfig(config_path)
+        setup_logging(config.config_dir)
 
-    print(f"""
+        print(f"""
 ═══════════════════════════════════════════
             DOLPHA1 SYSTEM                
                                           
@@ -117,51 +125,61 @@ async def main():
   📊 Realtime Data → dolpha1 table        
   🚨 Signal Generation → dolpha1_signal   
                                           
-  ⏱️  Current Time: {datetime.now().strftime('%H:%M:%S'):<15}
+  ⏱️ Current Time: {datetime.now().strftime('%H:%M:%S'):<15}
   📈 Band Breakout Strategy               
 ═══════════════════════════════════════════
-    """)
-    
-    user_input = input("📅 Do you want to collect historical data first? (y/n): ").lower().strip()
-    if user_input == 'y':
-        days = input("📅 How many days of data to collect? (default: 15): ").strip()
-        days_back = int(days) if days.isdigit() else 15
+        """)
         
-        feeder = RealTimeDataFeeder(symbol="106W09")
+        user_input = input("📅 Do you want to collect historical data first? (y/n): ").lower().strip()
+        if user_input == 'y':
+            days = input("📅 How many days of data to collect? (default: 15): ").strip()
+            days_back = int(days) if days.isdigit() else 15
+            
+            feeder = RealTimeDataFeeder(symbol="106W09")
+            try:
+                await feeder.collect_historical_data(days_back=days_back)
+                await feeder.verify_historical_data(days_back=days_back, auto_fix=True)
+            except Exception as e:
+                print(f"❌ Historical data collection failed: {e}")
+                logging.error(f"Historical data collection failed: {e}", exc_info=True)
+            finally:
+                await feeder.close()
+            
+            print("━" * 50)
+        
+        system = Dolpha1Strategy(symbol="106W09")
+        
         try:
-            await feeder.collect_historical_data(days_back=days_back)
-            await feeder.verify_historical_data(days_back=days_back)
+            await system.initialize()
+            
+            current_time = datetime.now().strftime('%H:%M')
+            if current_time >= '08:45':
+                print("📅 Checking for missing data today...")
+                print("━" * 50)
+                await system.feeder.collect_today_missing_data()
+                print("━" * 50)
+            
+            print("📡 Starting realtime data feed...")
+            print("🔄 Press Ctrl+C to exit")
+            print("=" * 50)
+            
+            await system.start_realtime_feed()
+            
+        except KeyboardInterrupt:
+            print("\n🛑 Interrupted by user")
+        except Exception as e:
+            print(f"\n❌ System error: {e}")
+            logging.error(f"System error: {e}", exc_info=True)
+            raise
         finally:
-            await feeder.close()
-        
-        print("━" * 50)
-    
-    db_config = DatabaseConfig.from_json("db_config.json")
-    db_connection = DatabaseConnection(db_config)
-    data_writer = DataWriter(db_connection)
-    
-    await db_connection.initialize()
-    print("✅ Database connected")
-    print("━" * 50)
-    
-    system = Dolpha1Strategy(symbol="106W09")
-    
-    try:
-        await system.initialize()
-        print("📡 Starting realtime data feed...")
-        print("🔄 Press Ctrl+C to exit")
-        print("=" * 50)
-        
-        await system.start_realtime_feed()
-        
-    except KeyboardInterrupt:
-        print("\n🛑 Interrupted by user")
+            await system.close_connections()
+            print("👋 System shutdown")
+            
     except Exception as e:
-        print(f"\n❌ System error: {e}")
-        logging.error(f"System error: {e}", exc_info=True)
-    finally:
-        await system.close_connections()
-        print("👋 System shutdown")
+        print(f"\n❌ Critical error in main: {e}")
+        logging.error(f"Critical error in main: {e}", exc_info=True)
+        input("\n⚠️ Press Enter to exit...")
+        raise
 
 if __name__ == "__main__":
     try:

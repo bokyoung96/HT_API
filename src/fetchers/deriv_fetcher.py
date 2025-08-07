@@ -86,8 +86,9 @@ class DerivPriceFetcher(PriceFetcher):
 
         try:
             timestamp_dt = datetime.strptime(f"{candle_date}{candle_time}", "%Y%m%d%H%M%S")
-            # NOTE: Characteristics of HT API
-            timestamp_dt += timedelta(minutes=1) 
+            
+            if candle_time != "154500":
+                timestamp_dt += timedelta(minutes=1)
 
             kst = timezone(timedelta(hours=9))
             timestamp_kst = timestamp_dt.replace(tzinfo=kst)

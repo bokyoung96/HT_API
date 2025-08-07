@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -73,9 +73,15 @@ class StockPriceFetcher(PriceFetcher):
         if not candle:
             return None
 
+        base_timestamp = datetime.now().replace(second=0, microsecond=0)
+        
+        current_time = base_timestamp.strftime("%H%M")
+        if current_time != "1530":
+            base_timestamp += timedelta(minutes=1)
+
         return CandleData(
             symbol=self.symbol,
-            timestamp=datetime.now().replace(second=0, microsecond=0),
+            timestamp=base_timestamp,
             timeframe=self.timeframe,
             open=int(candle.get("stck_oprc", 0)),
             high=int(candle.get("stck_hgpr", 0)),
