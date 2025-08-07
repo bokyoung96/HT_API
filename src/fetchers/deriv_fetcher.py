@@ -90,16 +90,13 @@ class DerivPriceFetcher(PriceFetcher):
             if candle_time != "154500":
                 timestamp_dt += timedelta(minutes=1)
 
-            kst = timezone(timedelta(hours=9))
-            timestamp_kst = timestamp_dt.replace(tzinfo=kst)
-
         except ValueError:
             logging.error(f"Could not parse timestamp from candle data: {candle}")
             return None
 
         return CandleData(
             symbol=self.symbol,
-            timestamp=timestamp_kst,
+            timestamp=timestamp_dt,
             timeframe=self.timeframe,
             open=float(candle.get("futs_oprc", 0)),
             high=float(candle.get("futs_hgpr", 0)),

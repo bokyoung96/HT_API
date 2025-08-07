@@ -79,11 +79,10 @@ class OptionChainFetcher(PriceFetcher):
         calls = [self._process_option_data(o) for o in calls_raw]
         puts = [self._process_option_data(o) for o in puts_raw]
 
-        # Create underlying_symbol from maturity
         underlying_symbol = f"{self.maturity}_KOSPI200" if self.maturity else "unknown"
         
         chain_data = OptionChainData(
-            timestamp=datetime.now(timezone(timedelta(hours=9))),
+            timestamp=datetime.now(),
             underlying_symbol=underlying_symbol,
             underlying_price=underlying_price,
             calls=[c for c in calls if c],

@@ -36,7 +36,7 @@ class DataFeeder:
         async with self.db_connection.pool.acquire() as conn:
             await conn.execute(f"""
                 CREATE TABLE IF NOT EXISTS {self.table_name} (
-                    timestamp TIMESTAMPTZ NOT NULL,
+                    timestamp TIMESTAMP NOT NULL,
                     symbol TEXT NOT NULL,
                     open DOUBLE PRECISION,
                     high DOUBLE PRECISION,
@@ -164,11 +164,8 @@ class RealtimeDataCollector(DataFeeder):
         if time_str != "154500":
             timestamp_dt += timedelta(minutes=1)
             
-        kst = timezone(timedelta(hours=9))
-        timestamp_kst = timestamp_dt.replace(tzinfo=kst)
-        
         candle_data = {
-            "timestamp": timestamp_kst,
+            "timestamp": timestamp_dt,
             "symbol": self.symbol,
             "open": float(candle.get("futs_oprc", 0)),
             "high": float(candle.get("futs_hgpr", 0)),
@@ -219,11 +216,10 @@ class HistoricalDataCollector(DataFeeder):
         return [day.strftime("%Y%m%d") for day in trading_days]
         
     async def _get_existing_data_status(self) -> Dict[str, int]:
-        """기존 데이터베이스에 있는 날짜별 레코드 수를 반환"""
         async with self.db_connection.pool.acquire() as conn:
             query = f"""
                 SELECT 
-                    TO_CHAR(timestamp AT TIME ZONE 'Asia/Seoul', 'YYYYMMDD') as date_str,
+                    TO_CHAR(timestamp, 'YYYYMMDD') as date_str,
                     COUNT(*) as count
                 FROM {self.table_name}
                 WHERE symbol = $1
@@ -368,7 +364,7 @@ class HistoricalDataCollector(DataFeeder):
                     dt += timedelta(minutes=1)
                     
                 records.append({
-                    "timestamp": dt.replace(tzinfo=kst),
+                    "timestamp": dt,
                     "symbol": self.symbol,
                     "open": float(candle.get("futs_oprc", 0)),
                     "high": float(candle.get("futs_hgpr", 0)),

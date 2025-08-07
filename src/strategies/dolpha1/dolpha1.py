@@ -90,15 +90,15 @@ class Dolpha1Strategy:
                     SELECT timestamp, symbol, open, high, low, close, volume
                     FROM {self.feeder.table_name}
                     WHERE symbol = $1
-                    ORDER BY timestamp DESC
-                    LIMIT 10000
+                      AND timestamp >= NOW() - INTERVAL '30 days'
+                    ORDER BY timestamp
                 """
                 records = await conn.fetch(query, self.symbol)
                 
                 if records:
                     import pandas as pd
                     df = pd.DataFrame([dict(record) for record in records])
-                    return df.sort_values('timestamp').reset_index(drop=True)
+                    return df
                     
         except Exception as e:
             logging.error(f"❌ Failed to retrieve data: {e}")

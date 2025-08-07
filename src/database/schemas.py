@@ -6,7 +6,7 @@ def create_futures_table_sql(symbol: str) -> str:
     return f"""
 CREATE TABLE IF NOT EXISTS {table_name} (
     id SERIAL PRIMARY KEY,
-    timestamp TIMESTAMPTZ NOT NULL,
+    timestamp TIMESTAMP NOT NULL,
     symbol VARCHAR(20) NOT NULL,
     open NUMERIC(10,2) NOT NULL,
     high NUMERIC(10,2) NOT NULL,
@@ -24,7 +24,7 @@ CREATE INDEX IF NOT EXISTS idx_{table_name}_symbol ON {table_name}(symbol);
 STOCKS_1M_TABLE = """
 CREATE TABLE IF NOT EXISTS stocks_1m (
     id SERIAL PRIMARY KEY,
-    timestamp TIMESTAMPTZ NOT NULL,
+    timestamp TIMESTAMP NOT NULL,
     symbol VARCHAR(20) NOT NULL,
     timeframe INTEGER NOT NULL,
     open NUMERIC(10,2) NOT NULL,
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS stocks_1m (
     low NUMERIC(10,2) NOT NULL,
     close NUMERIC(10,2) NOT NULL,
     volume BIGINT NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
+    created_at TIMESTAMP DEFAULT NOW(),
     UNIQUE(timestamp, symbol, timeframe)
 );
 
@@ -44,7 +44,7 @@ CREATE INDEX IF NOT EXISTS idx_stocks_1m_symbol ON stocks_1m(symbol);
 OPTION_CHAIN_RAW_TABLE = """
 CREATE TABLE IF NOT EXISTS option_chain_raw (
     id SERIAL PRIMARY KEY,
-    timestamp TIMESTAMPTZ NOT NULL,
+    timestamp TIMESTAMP NOT NULL,
     underlying_symbol VARCHAR(20) NOT NULL,
     underlying_price NUMERIC(10,2) NOT NULL,
     option_symbol VARCHAR(50) NOT NULL,
@@ -75,7 +75,7 @@ def create_option_matrices_table_sql(underlying_symbol: str) -> str:
     return f"""
 CREATE TABLE IF NOT EXISTS {table_name} (
     id SERIAL PRIMARY KEY,
-    timestamp TIMESTAMPTZ NOT NULL,
+    timestamp TIMESTAMP NOT NULL,
     underlying_symbol VARCHAR(50) NOT NULL,
     metric_type VARCHAR(20) NOT NULL,
     
@@ -93,7 +93,7 @@ CREATE TABLE IF NOT EXISTS {table_name} (
     p_otm1 NUMERIC(8,4), p_otm2 NUMERIC(8,4), p_otm3 NUMERIC(8,4), p_otm4 NUMERIC(8,4), p_otm5 NUMERIC(8,4),
     p_otm6 NUMERIC(8,4), p_otm7 NUMERIC(8,4), p_otm8 NUMERIC(8,4), p_otm9 NUMERIC(8,4), p_otm10 NUMERIC(8,4),
     
-    created_at TIMESTAMPTZ DEFAULT NOW(),
+    created_at TIMESTAMP DEFAULT NOW(),
     UNIQUE(timestamp, underlying_symbol, metric_type)
 );
 
@@ -105,12 +105,12 @@ CREATE INDEX IF NOT EXISTS idx_{table_name}_metric ON {table_name}(metric_type);
 SYSTEM_STATUS_TABLE = """
 CREATE TABLE IF NOT EXISTS system_status (
     id SERIAL PRIMARY KEY,
-    timestamp TIMESTAMPTZ DEFAULT NOW(),
+    timestamp TIMESTAMP DEFAULT NOW(),
     component VARCHAR(50) NOT NULL, -- 'futures_fetcher', 'option_chain_fetcher', etc
     status VARCHAR(20) NOT NULL,     -- 'running', 'stopped', 'error'
     message TEXT,
     data_count INTEGER DEFAULT 0,
-    last_data_time TIMESTAMPTZ
+    last_data_time TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_system_status_timestamp ON system_status(timestamp);
