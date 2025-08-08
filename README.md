@@ -1,4 +1,4 @@
-## korea_realtime_trading — Real‑time Market Data Pipeline & Strategy Engine
+## Korea realtime trading : Trading Data Pipeline & Strategy Engine
 
 Production‑ready system for collecting, processing, and storing Korean market data (futures, options, stocks) with KIS API. Built on asyncio, robust error handling, and a clean, modular architecture.
 
