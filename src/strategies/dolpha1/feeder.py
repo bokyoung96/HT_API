@@ -12,6 +12,8 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 sys.path.append(PROJECT_ROOT)
 
 from base import KISAuth, KISConfig
+from services.time_service import TimeService
+from consts import Constants
 from database.connection import DatabaseConnection
 from database.config import DatabaseConfig
 
@@ -96,10 +98,9 @@ class RealtimeDataCollector(DataFeeder):
                     await asyncio.sleep(5)
                     
     def _is_trading_hours(self) -> bool:
-        kst = timezone(timedelta(hours=9))
-        now = datetime.now(kst)
+        now = TimeService.now_kst()
         current_time = now.time()
-        return time(8, 45) <= current_time <= time(15, 47)
+        return Constants.MARKET_HOURS_DERIV_START <= current_time <= Constants.MARKET_HOURS_DERIV_END
         
     async def _fetch_latest_candle(self, client: httpx.AsyncClient, auth: KISAuth) -> Optional[Dict[str, Any]]:
         url = f"{self.config.base_url}/uapi/domestic-futureoption/v1/quotations/inquire-time-fuopchartprice"
@@ -118,7 +119,7 @@ class RealtimeDataCollector(DataFeeder):
             "fid_pw_data_incu_yn": "Y",
             "fid_fake_tick_incu_yn": "N",
             "fid_input_date_1": "",
-            "fid_input_hour_1": datetime.now().strftime("%H%M%S"),
+            "fid_input_hour_1": TimeService.now_kst_naive().strftime("%H%M%S"),
         }
         
         try:
@@ -184,6 +185,9 @@ class RealtimeDataCollector(DataFeeder):
             timestamp = candle_data['timestamp']
             if isinstance(timestamp, str):
                 timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+            
+            if isinstance(timestamp, datetime) and timestamp.tzinfo is not None:
+                timestamp = TimeService.to_kst_naive(timestamp)
                 
             async with self.db_connection.pool.acquire() as conn:
                 await conn.execute(f"""
@@ -206,8 +210,7 @@ class HistoricalDataCollector(DataFeeder):
         
     def get_trading_days(self, days_back: int = 30) -> List[str]:
         krx = mcal.get_calendar("XKRX")
-        kst = timezone(timedelta(hours=9))
-        end_date = datetime.now(kst)
+        end_date = TimeService.now_kst()
         start_date = end_date - timedelta(days=days_back * 2)
         
         schedule = krx.schedule(start_date=start_date.date(), end_date=end_date.date())
@@ -255,10 +258,9 @@ class HistoricalDataCollector(DataFeeder):
         logging.info(f"🎉 Historical data collection complete! Total {total_records} new records")
         
     async def collect_today_missing_data(self):
-        kst = timezone(timedelta(hours=9))
-        now = datetime.now(kst)
+        now = TimeService.now_kst()
         
-        if now.time() < time(8, 45):
+        if now.time() < Constants.MARKET_HOURS_DERIV_START:
             logging.info("📅 Market not started yet")
             return
             
@@ -269,8 +271,8 @@ class HistoricalDataCollector(DataFeeder):
             raw_candles = await self._fetch_day_data(today_str)
             if raw_candles:
                 processed_records = self._process_historical_candles(raw_candles)
-                current_minute = now.replace(second=0, microsecond=0)
-                filtered = [r for r in processed_records if r['timestamp'] < current_minute]
+                current_minute_naive = TimeService.floor_minute_kst(now)
+                filtered = [r for r in processed_records if r['timestamp'] < current_minute_naive]
                 
                 if filtered:
                     await self._save_batch(filtered)
@@ -345,7 +347,6 @@ class HistoricalDataCollector(DataFeeder):
         
     def _process_historical_candles(self, candles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         records = []
-        kst = timezone(timedelta(hours=9))
         
         for candle in candles:
             try:

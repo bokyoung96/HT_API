@@ -1,6 +1,8 @@
 import asyncio
 import logging
 from datetime import datetime, time
+from services.time_service import TimeService
+from consts import Constants
 
 import httpx
 from base import KISAuth, KISConfig, setup_logging
@@ -9,9 +11,9 @@ from database import DatabaseConfig, DatabaseConnection, DataWriter
 
 
 async def wait_for_market_open():
-    now = datetime.now()
+    now = TimeService.now_kst_naive()
     current_time = now.time()
-    market_open = time(8, 45)
+    market_open = Constants.MARKET_HOURS_DERIV_START
     
     if current_time < market_open:
         market_open_datetime = datetime.combine(now.date(), market_open)
@@ -31,7 +33,7 @@ async def main():
 
     setup_logging(config.config_dir)
 
-    print(f"🕐 Current time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"🕐 Current time: {TimeService.now_kst_naive().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"⚙️ Polling interval: {config.polling_interval} seconds")
     print("🏢 Stock market hours: 09:00 ~ 15:30")
     print("📈 Derivatives market hours: 08:45 ~ 15:45")

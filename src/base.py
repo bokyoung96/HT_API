@@ -42,7 +42,7 @@ class KISConfig:
         self.polling_interval = config.get("polling_interval", 2)
         self.stock_minute_tr_id = config.get("tr_id", {}).get("stock_minute", "FHKST03010200")
         self.deriv_minute_tr_id = config.get("tr_id", {}).get("deriv_minute", "FHKIF03020200")
-        self.option_chain_tr_id = config.get("tr_id", {}).get("option_chain", "FHPIF05030100")
+        self.option_chain_tr_id = config.get("tr_id", {}).get("option_chain", "FHlkPIF05030100")
         
         self.app_key = config.get("app_key")
         self.app_secret = config.get("app_secret")

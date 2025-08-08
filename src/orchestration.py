@@ -4,13 +4,19 @@ import logging
 from typing import TYPE_CHECKING, Optional, Type
 
 from base import KISAuth, KISConfig
+from services.time_service import TimeService
 from core.feed import KISDataFeed
 from core.subscription import SubscriptionManager
 from fetchers.factory import FetcherFactory
 from models.dataclasses import SubscriptionConfig
 from models.enums import DataType
 from processing.processors import DataProcessor
-from protocols import DataFeed, DataProcessor as DataProcessorProtocol, FetcherFactory as FetcherFactoryProtocol, SubscriptionManager as SubscriptionManagerProtocol
+from protocols import (
+    DataFeed,
+    DataProcessor as DataProcessorProtocol,
+    FetcherFactory as FetcherFactoryProtocol,
+    SubscriptionManager as SubscriptionManagerProtocol,
+)
 
 if TYPE_CHECKING:
     import httpx

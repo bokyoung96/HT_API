@@ -1,6 +1,7 @@
 import logging
 import warnings
 from datetime import datetime
+from services.time_service import TimeService
 from typing import Dict, List
 
 import pandas as pd
@@ -60,7 +61,7 @@ class OptionMatrixProcessor:
                 [self.matrices[metric], new_rows[metric].to_frame().T]
             )
 
-        now = datetime.now()
+        now = TimeService.now_kst_naive()
         if self._last_print_time is None or (now - self._last_print_time).total_seconds() >= 60:
             logging.info(
                 f"📊 Option matrices updated for timestamp {chain_data.timestamp.isoformat()}."

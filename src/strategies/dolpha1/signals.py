@@ -11,6 +11,7 @@ sys.path.append(PROJECT_ROOT)
 
 from database.connection import DatabaseConnection
 from database.config import DatabaseConfig
+from services.time_service import TimeService
 
 class SignalGenerator:
     def __init__(self, 
@@ -129,7 +130,7 @@ class SignalGenerator:
             
         latest_row = valid_rows.iloc[-1]
         
-        current_time = datetime.now()
+        current_time = TimeService.now_kst_naive()
         is_observe_time = (current_time.minute % self.observe_interval_minutes == 0)
         
         monitor_signal = 0
