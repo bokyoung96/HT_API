@@ -1,146 +1,113 @@
-## korea realtime trading : Trading Data Pipeline & Strategy Engine
+## korea_realtime_trading — Real‑time Market Data Pipeline & Strategy Engine
 
-🚀 **Advanced real-time market data collection and algorithmic trading system** built with Korea Investment Securities API integration, featuring asynchronous data processing, automated trading strategies, and enterprise-grade database management.
+Production‑ready system for collecting, processing, and storing Korean market data (futures, options, stocks) with KIS API. Built on asyncio, robust error handling, and a clean, modular architecture.
 
-## 🎯 Project Overview
+### Highlights
+- Real‑time data feeds for KOSPI/KOSDAQ futures, KOSPI200 options, and stocks
+- Strict time policy: all DB writes/comparisons use KST‑naive (TIMESTAMP)
+- Dynamic tables per instrument/underlying with safe UPSERT behavior
+- Clear separation of concerns: fetchers, core, processing, database, strategies
 
-**korea_realtime_trading** is a production-ready financial technology system that implements real-time market data collection, processing, and algorithmic trading strategies using the Korea Investment Securities (KIS) API. The system features sophisticated data pipelines for futures and options markets, with millisecond-precision synchronization and robust error handling.
-
-### Key Technical Achievements
-
-- **Real-time Data Processing**: Asynchronous data collection with <2-second latency for KOSPI/KOSDAQ futures and KOSPI200 options
-- **Scalable Architecture**: Modular design supporting multiple concurrent trading strategies and data feeds
-- **Database Optimization**: Dynamic table generation and real-time UPSERT operations with Supabase PostgreSQL
-- **Market Synchronization**: Precise minute-interval polling with automatic retry mechanisms for data integrity
-- **Production-Ready**: Comprehensive error handling, logging, and monitoring systems
-
-## 🛠️ Technology Stack
-
-### Core Technologies
-- **Python 3.9+** - Asynchronous programming with asyncio/await
-- **httpx** - High-performance async HTTP client for API communication
-- **Supabase/PostgreSQL** - Real-time database with automatic scaling
-- **Pandas** - Advanced data manipulation and analysis
-
-### Architecture Patterns
-- **Factory Pattern** - Dynamic fetcher instantiation
-- **Observer Pattern** - Real-time data subscription and processing
-- **Strategy Pattern** - Pluggable trading algorithms
-- **Repository Pattern** - Data access abstraction layer
-
-## 🏗️ System Architecture
-
-```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   KIS API       │───▶│  Data Pipeline   │───▶│   Supabase DB   │
-│   (External)    │    │  (HT_API Core)   │    │   (Real-time)   │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-                              │
-                              ▼
-                       ┌──────────────────┐
-                       │ Trading Strategies│
-                       │   (dolpha1, etc)  │
-                       └──────────────────┘
-```
-
-### Core Components
-
-#### 🔄 **Data Collection Engine**
-- **Multi-threaded Fetchers**: Concurrent data collection for futures/options/stocks
-- **Synchronization Manager**: Coordinated minute-interval polling across all instruments
-- **Error Recovery**: Automatic retry with exponential backoff for failed API calls
-
-#### 📊 **Data Processing Pipeline**
-- **Real-time Processors**: OHLCV candle data transformation and validation
-- **Matrix Processor**: Options chain data normalization into analytical matrices
-- **Database Writer**: Optimized bulk insert/update operations with conflict resolution
-
-#### 📈 **Trading Strategy Framework**
-- **Signal Generation**: Technical indicator calculation and pattern recognition
-- **Strategy Engine**: Modular algorithm execution with risk management
-- **Performance Analytics**: Real-time P&L tracking and trade analysis
-
-## 🚀 Key Features
-
-### Real-Time Data Management
-- **Multi-Asset Support**: KOSPI200/KOSDAQ150 futures, KOSPI200 options, individual stocks
-- **Precision Timing**: Sub-second market data synchronization with Korean market hours
-- **Data Integrity**: Comprehensive validation and duplicate prevention mechanisms
-- **Dynamic Scaling**: Automatic table creation and schema management
-
-### Advanced Trading Capabilities
-- **Algorithmic Strategies**: Implementation of quantitative trading algorithms (dolpha1 strategy)
-- **Risk Management**: Position sizing, stop-loss, and exposure controls
-- **Market Analysis**: Real-time volatility calculations and trend detection
-- **Backtesting Support**: Historical data analysis and strategy optimization
-
-### Enterprise Features
-- **High Availability**: Robust error handling and automatic service recovery
-- **Monitoring & Logging**: Comprehensive system health tracking and debugging
-- **Configuration Management**: Environment-specific settings and API key management
-- **Security**: Encrypted credential storage and secure API communication
-
-## 📊 Performance Metrics
-
-- **Latency**: <2 seconds end-to-end data processing
-- **Throughput**: 1000+ market updates per minute during peak hours
-- **Uptime**: 99.9% availability during market hours
-- **Data Accuracy**: Zero data loss with automatic gap detection and recovery
-
-## 🔧 Technical Implementation
-
-### Asynchronous Architecture
-```python
-# High-performance async data collection
-async def collect_market_data():
-    async with httpx.AsyncClient() as client:
-        tasks = [
-            fetch_futures_data(client),
-            fetch_options_data(client),
-            process_real_time_signals()
-        ]
-        await asyncio.gather(*tasks)
-```
-
-### Database Optimization
-```sql
--- Dynamic table creation with optimized indexing
-CREATE TABLE futures_{ticker} (
-    id SERIAL PRIMARY KEY,
-    timestamp TIMESTAMPTZ NOT NULL,
-    symbol VARCHAR(20) NOT NULL,
-    ohlcv_data NUMERIC[],
-    UNIQUE(timestamp, symbol)
-);
-```
-
-### Strategy Implementation
-```python
-class Dolpha1Strategy:
-    """Production trading strategy with risk management"""
-    async def generate_signals(self, market_data):
-        # Technical analysis and signal generation
-        # Risk assessment and position sizing
-        # Order execution and monitoring
-```
-
-## 📈 Business Impact
-
-- **Market Edge**: Sub-second decision making capability in volatile markets
-- **Risk Reduction**: Automated risk controls and position management
-- **Scalability**: Support for multiple concurrent trading strategies
-- **Data Analytics**: Rich dataset for quantitative research and backtesting
-
-## 🏆 Professional Highlights
-
-This project demonstrates expertise in:
-- **Financial Technology**: Deep understanding of market microstructure and trading systems
-- **Software Architecture**: Design of scalable, maintainable systems with clean separation of concerns
-- **Performance Engineering**: Optimization for low-latency, high-throughput financial applications
-- **Database Design**: Real-time data management with complex querying requirements
-- **API Integration**: Robust integration with external financial data providers
-- **Quantitative Finance**: Implementation of mathematical models and trading algorithms
+For full architecture details, see pipeline.md.
 
 ---
 
-*Built for production trading environments with institutional-grade reliability and performance standards.*
+## Project Layout (src/)
+- base.py: KISConfig, KISAuth, setup_logging
+- core/: Polling/Feed/Subscriptions (PollingManager, KISDataFeed, SubscriptionManager)
+- fetchers/: StockPriceFetcher, DerivPriceFetcher, OptionChainFetcher, FetcherFactory
+- processing/: DataProcessor, OptionMatrixProcessor
+- database/: DatabaseConnection, DataWriter, schemas
+- services/time_service.py: TimeService (KST aware/naive helpers)
+- strategies/dolpha1/: Realtime/Historical collectors, verification, signal generation
+- consts.py: Constants (market hours, etc.)
+- utils.py: is_market_open
+- orchestration.py: DataFeedBuilder, DataFeedOrchestrator
+- main.py: Entry point for the core data feed
+
+---
+
+## Time & DB Policy (Must‑read)
+- All stored/compared timestamps are KST‑naive (datetime with tzinfo=None)
+- Any tz‑aware datetime must be normalized via TimeService.to_kst_naive(dt)
+- PostgreSQL columns are TIMESTAMP (no time zone)
+
+Example schema
+```sql
+CREATE TABLE futures_106 (
+  id SERIAL PRIMARY KEY,
+  timestamp TIMESTAMP NOT NULL,
+  symbol VARCHAR(20) NOT NULL,
+  open NUMERIC(10,2) NOT NULL,
+  high NUMERIC(10,2) NOT NULL,
+  low NUMERIC(10,2) NOT NULL,
+  close NUMERIC(10,2) NOT NULL,
+  volume BIGINT NOT NULL,
+  UNIQUE(timestamp, symbol)
+);
+```
+
+---
+
+## Quick Start
+1) Configure credentials and endpoints
+   - src/config.json (KIS API base_url, keys, polling interval, tr_id)
+   - src/db_config.json (Postgres URL, pool settings)
+
+2) Run (recommended via batch)
+   - Core feed: HT_API/run.bat
+   - Strategy: HT_API/src/strategies/dolpha1/dolpha1.bat
+
+Alternative
+- From repo root: `python -m src.main`
+- Or: `cd src && python main.py`
+
+---
+
+## Data Pipeline (Summary)
+1) main.py initializes DB and subscriptions → DataFeedOrchestrator.start()
+2) PollingManager runs per‑minute+interval fetch cycles
+3) fetchers push to a shared queue → DataProcessor
+4) Candles are batch‑upserted; option chains are aggregated into matrices and upserted
+5) strategies/dolpha1 performs realtime/historical collection, verification, and signal writes
+
+---
+
+## Configuration
+- src/config.json
+  - base_url, app_key/app_secret, account_no/_sub, polling_interval, tr_id
+- src/db_config.json
+  - postgres_url, pool_settings (min/max size, server_settings)
+
+See pipeline.md for full examples.
+
+---
+
+## Extensibility
+- New fetcher: subclass PriceFetcher → register in FetcherFactory
+- New metrics/matrices: extend OptionMatrixProcessor and DataWriter.save_option_matrices
+- New strategy: add under strategies/<name> with feeder/signals modules
+
+---
+
+## Troubleshooting
+- Error: "can't compare offset‑naive and offset‑aware datetimes"
+  - Cause: mixing tz‑aware and naive timestamps
+  - Fix: always normalize to KST‑naive via TimeService.to_kst_naive(dt) before comparing or storing
+
+---
+
+## Security
+- Keep API keys out of VCS; use config.json only locally or via a secrets manager
+- Access tokens are cached in src/access_token.json and auto‑rotated before expiry
+
+---
+
+## License
+See LICENSE in this directory.
+
+---
+
+## Further Reading
+For a deep dive (architecture diagrams, class responsibilities, runtime sequences, FAQs), read pipeline.md.
+
