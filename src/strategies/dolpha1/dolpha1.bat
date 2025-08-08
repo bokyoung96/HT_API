@@ -16,7 +16,7 @@ echo 🐍 Python environment ready
 echo ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 echo Passing CLI args: %*
-python dolpha1.py --symbol 106W09 --atr-period 10 --rolling-move 5 --band-multiplier 1.0 --use-vwap true --observe-interval 5
+python dolpha1.py --symbol 106W09 --atr-period 10 --rolling-move 14 --band-multiplier 1.0 --use-vwap true --observe-interval 15
 
 if %ERRORLEVEL% NEQ 0 (
     echo.

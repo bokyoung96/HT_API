@@ -87,6 +87,10 @@ class Dolpha1Strategy:
                     logging.info(f"📊 Signal check - Data points: {len(recent_data)}, Reason: {reason}")
                 
                 if not reason.startswith("insufficient_data"):
+                    latest_day = recent_data.iloc[-1]['timestamp'].date()
+                    today_day = TimeService.now_kst_naive().date()
+                    if latest_day != today_day:
+                        return
                     latest_row = recent_data.iloc[-1]
                     await self.signal_database.save_signal(
                         latest_row['timestamp'], latest_row['symbol'], signal_result
