@@ -30,6 +30,10 @@ class KISConfig:
     stock_minute_tr_id: str
     deriv_minute_tr_id: str
     option_chain_tr_id: str
+    deriv_order_tr_id: str
+    deriv_order_rvsecncl_tr_id: str
+    deriv_balance_tr_id: str
+    deriv_order_list_tr_id: str
     config_dir: str
 
     def __init__(self, config_path: str):
@@ -43,6 +47,10 @@ class KISConfig:
         self.stock_minute_tr_id = config.get("tr_id", {}).get("stock_minute", "FHKST03010200")
         self.deriv_minute_tr_id = config.get("tr_id", {}).get("deriv_minute", "FHKIF03020200")
         self.option_chain_tr_id = config.get("tr_id", {}).get("option_chain", "FHlkPIF05030100")
+        self.deriv_order_tr_id = config.get("tr_id", {}).get("deriv_order", "TTTO1101U")
+        self.deriv_order_rvsecncl_tr_id = config.get("tr_id", {}).get("deriv_order_rvsecncl", "TTTO1103U")
+        self.deriv_balance_tr_id = config.get("tr_id", {}).get("deriv_balance", "CTFO6118R")
+        self.deriv_order_list_tr_id = config.get("tr_id", {}).get("deriv_order_list", "TTTO5201R")
         
         self.app_key = config.get("app_key")
         self.app_secret = config.get("app_secret")

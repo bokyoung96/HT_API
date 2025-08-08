@@ -146,6 +146,10 @@ class RealtimeDataCollector(DataFeeder):
         
         completed_candle = self._select_completed_candle(candles, current_time)
         if completed_candle:
+            date_str = completed_candle.get("stck_bsop_date")
+            today_str = TimeService.now_kst_naive().strftime("%Y%m%d")
+            if date_str != today_str:
+                return None
             return self._process_candle(completed_candle)
             
         return None
