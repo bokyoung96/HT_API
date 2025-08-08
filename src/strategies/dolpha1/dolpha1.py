@@ -13,6 +13,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 sys.path.append(PROJECT_ROOT)
 
 from base import KISConfig, setup_logging
+from services.time_service import TimeService
 from feeder import RealTimeDataFeeder
 from signals import SignalGenerator, SignalDatabase
 
@@ -41,7 +42,7 @@ class Dolpha1Strategy:
         await self._check_signal()
             
     async def _check_signal(self):
-        current_time = datetime.now()
+        current_time = TimeService.now_kst_naive()
         current_hour_min = current_time.strftime('%H:%M')
         
         if current_hour_min < '08:45' or current_hour_min >= '15:47':
@@ -125,7 +126,7 @@ async def main():
   📊 Realtime Data → dolpha1 table        
   🚨 Signal Generation → dolpha1_signal   
                                           
-  ⏱️ Current Time: {datetime.now().strftime('%H:%M:%S'):<15}
+   ⏱️ Current Time: {TimeService.now_kst_naive().strftime('%H:%M:%S'):<15}
   📈 Band Breakout Strategy               
 ═══════════════════════════════════════════
         """)
@@ -152,7 +153,7 @@ async def main():
         try:
             await system.initialize()
             
-            current_time = datetime.now().strftime('%H:%M')
+            current_time = TimeService.now_kst_naive().strftime('%H:%M')
             if current_time >= '08:45':
                 print("📅 Checking for missing data today...")
                 print("━" * 50)

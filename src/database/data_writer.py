@@ -1,9 +1,10 @@
 import asyncio
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 from typing import Dict, Any, List
 
 from database.connection import DatabaseConnection
+from services.time_service import TimeService
 
 
 class DataWriter:
@@ -21,7 +22,8 @@ class DataWriter:
         return
         
     async def save_option_matrices(self, matrix_data: Dict[str, Any]) -> None:
-        timestamp = datetime.fromisoformat(matrix_data["timestamp"]).astimezone(timezone(timedelta(hours=9)))
+        dt = datetime.fromisoformat(matrix_data["timestamp"])
+        timestamp = TimeService.to_kst_naive(dt)
         underlying_symbol = matrix_data["underlying_symbol"]
         
         table_key = f"option_matrices_{underlying_symbol.lower()}"
@@ -139,7 +141,7 @@ class DataWriter:
         params_list = []
         for candle in candles:
             params = (
-                datetime.fromisoformat(candle["timestamp"]),
+                TimeService.to_kst_naive(datetime.fromisoformat(candle["timestamp"])) if isinstance(candle["timestamp"], str) else candle["timestamp"],
                 candle["symbol"],
                 candle["open"],
                 candle["high"],

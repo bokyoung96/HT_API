@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from datetime import datetime
+from services.time_service import TimeService
 from typing import List, Any
 
 from fetchers.base_fetcher import PriceFetcher
@@ -16,7 +17,7 @@ class PollingManager:
     async def start_polling(self) -> None:
         self._running = True
         while self._running:
-            now = datetime.now()
+            now = TimeService.now_kst_naive()
             wait_seconds = (
                 60.0 - now.second - (now.microsecond / 1_000_000)
             ) + self._interval

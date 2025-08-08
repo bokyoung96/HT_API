@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from datetime import datetime, timezone, timedelta
+from services.time_service import TimeService
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -42,7 +43,7 @@ class DerivPriceFetcher(PriceFetcher):
         headers = await self.get_headers()
         headers["tr_id"] = self.config.deriv_minute_tr_id
 
-        query_time = datetime.now().strftime("%H%M%S")
+        query_time = TimeService.now_kst_naive().strftime("%H%M%S")
 
         params = {
             "fid_cond_mrkt_div_code": "F",

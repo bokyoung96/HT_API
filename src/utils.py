@@ -1,13 +1,15 @@
-from datetime import datetime, time
+from datetime import time
 from models.enums import MarketType
+from consts import Constants
+from services.time_service import TimeService
 
 
 def is_market_open(market_type: MarketType) -> bool:
-    now = datetime.now().time()
+    now_kst = TimeService.now_kst_naive().time()
 
     if market_type == MarketType.STOCK:
-        return time(9, 0) <= now <= time(15, 32)
+        return Constants.MARKET_HOURS_STOCK_START <= now_kst <= Constants.MARKET_HOURS_STOCK_END
     elif market_type == MarketType.DERIVATIVES:
-        return time(8, 45) <= now <= time(15, 47)
+        return Constants.MARKET_HOURS_DERIV_START <= now_kst <= Constants.MARKET_HOURS_DERIV_END
 
-    return False 
+    return False

@@ -1,6 +1,7 @@
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import timedelta
+from services.time_service import TimeService
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -42,7 +43,7 @@ class StockPriceFetcher(PriceFetcher):
         headers = await self.get_headers()
         headers["tr_id"] = self.config.stock_minute_tr_id
 
-        query_time = datetime.now().strftime("%H%M%S")
+        query_time = TimeService.now_kst_naive().strftime("%H%M%S")
 
         params = {
             "fid_etc_cls_code": "",
@@ -73,7 +74,7 @@ class StockPriceFetcher(PriceFetcher):
         if not candle:
             return None
 
-        base_timestamp = datetime.now().replace(second=0, microsecond=0)
+        base_timestamp = TimeService.floor_minute_kst()
         
         current_time = base_timestamp.strftime("%H%M")
         if current_time != "1530":

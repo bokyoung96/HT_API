@@ -1,6 +1,5 @@
 # NOTE: 1m futures data
 def create_futures_table_sql(symbol: str) -> str:
-    # Use first 3 chars for table name (e.g., 101W09 -> 101)
     table_name_suffix = symbol[:3].lower()
     table_name = f"futures_{table_name_suffix}"
     return f"""

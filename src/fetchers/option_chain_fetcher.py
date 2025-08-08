@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from datetime import datetime, timezone, timedelta
+from services.time_service import TimeService
 from typing import Any, Dict, Optional
 
 import httpx
@@ -38,7 +39,7 @@ class OptionChainFetcher(PriceFetcher):
             )
             return {}
 
-        current_minute = datetime.now().strftime("%H%M")
+        current_minute = TimeService.now_kst_naive().strftime("%H%M")
         if self._last_fetch_minute == current_minute:
             return {}
         
@@ -82,7 +83,7 @@ class OptionChainFetcher(PriceFetcher):
         underlying_symbol = f"{self.maturity}_KOSPI200" if self.maturity else "unknown"
         
         chain_data = OptionChainData(
-            timestamp=datetime.now(),
+            timestamp=TimeService.now_kst(),
             underlying_symbol=underlying_symbol,
             underlying_price=underlying_price,
             calls=[c for c in calls if c],
