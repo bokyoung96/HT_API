@@ -1,4 +1,5 @@
 import asyncio
+import argparse
 import logging
 import warnings
 from datetime import datetime
@@ -18,14 +19,28 @@ from feeder import RealTimeDataFeeder
 from signals import SignalGenerator, SignalDatabase
 
 class Dolpha1Strategy:
-    def __init__(self, symbol: str = "106W09"):
+    def __init__(
+        self,
+        symbol: str = "106W09",
+        atr_period: int = 10,
+        rolling_move: int = 5,
+        band_multiplier: float = 1.0,
+        use_vwap: bool = True,
+        observe_interval_minutes: int = 5,
+    ):
         self.symbol = symbol
 
         config_path = os.path.join(PROJECT_ROOT, "config.json")
         self.config = KISConfig(config_path=config_path)
 
         self.feeder = RealTimeDataFeeder(symbol)
-        self.signal_generator = SignalGenerator()
+        self.signal_generator = SignalGenerator(
+            atr_period=atr_period,
+            rolling_move=rolling_move,
+            band_multiplier=band_multiplier,
+            use_vwap=use_vwap,
+            observe_interval_minutes=observe_interval_minutes,
+        )
         self.signal_database = SignalDatabase()
 
         self.last_signal_time = None
@@ -118,11 +133,21 @@ async def main():
         config = KISConfig(config_path)
         setup_logging(config.config_dir)
 
+        parser = argparse.ArgumentParser(prog="dolpha1", add_help=True)
+        parser.add_argument("--symbol", type=str, default="106W09")
+        parser.add_argument("--atr-period", type=int, default=10)
+        parser.add_argument("--rolling-move", type=int, default=5)
+        parser.add_argument("--band-multiplier", type=float, default=1.0)
+        parser.add_argument("--use-vwap", type=str, choices=["true", "false"], default="true")
+        parser.add_argument("--observe-interval", type=int, default=5)
+        args = parser.parse_args()
+        use_vwap_flag = args.use_vwap.lower() == "true"
+
         print(f"""
 ═══════════════════════════════════════════
             DOLPHA1 SYSTEM                
                                           
-  🎯 Target: KOSDAQ150 Futures (106W09)   
+  🎯 Target: {args.symbol}   
   📊 Realtime Data → dolpha1 table        
   🚨 Signal Generation → dolpha1_signal   
                                           
@@ -136,7 +161,7 @@ async def main():
             days = input("📅 How many days of data to collect? (default: 15): ").strip()
             days_back = int(days) if days.isdigit() else 15
             
-            feeder = RealTimeDataFeeder(symbol="106W09")
+            feeder = RealTimeDataFeeder(symbol=args.symbol)
             try:
                 await feeder.collect_historical_data(days_back=days_back)
                 await feeder.verify_historical_data(days_back=days_back, auto_fix=True)
@@ -148,7 +173,14 @@ async def main():
             
             print("━" * 50)
         
-        system = Dolpha1Strategy(symbol="106W09")
+        system = Dolpha1Strategy(
+            symbol=args.symbol,
+            atr_period=args.atr_period,
+            rolling_move=args.rolling_move,
+            band_multiplier=args.band_multiplier,
+            use_vwap=use_vwap_flag,
+            observe_interval_minutes=args.observe_interval,
+        )
         
         try:
             await system.initialize()

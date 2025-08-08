@@ -15,7 +15,8 @@ call conda activate myenv
 echo 🐍 Python environment ready
 echo ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-python dolpha1.py
+echo Passing CLI args: %*
+python dolpha1.py --symbol 106W09 --atr-period 10 --rolling-move 5 --band-multiplier 1.0 --use-vwap true --observe-interval 5
 
 if %ERRORLEVEL% NEQ 0 (
     echo.
